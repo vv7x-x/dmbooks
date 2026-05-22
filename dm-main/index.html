@@ -72,31 +72,8 @@
                 </div>
             </div>
             <div class="hero-visual">
-                <div class="book-stack">
-                    <div class="book-3d">
-                        <div class="book-3d-spine"></div>
-                        <div class="book-3d-content">
-                            <h4 style="font-family: var(--font-display-en);">The Great Gatsby</h4>
-                            <div class="book-ornament"></div>
-                            <p style="font-family: var(--font-body-en);">F. Scott Fitzgerald</p>
-                        </div>
-                    </div>
-                    <div class="book-3d">
-                        <div class="book-3d-spine"></div>
-                        <div class="book-3d-content">
-                            <h4 style="font-family: var(--font-display-ar); font-size: 18px;">أولاد حارتنا</h4>
-                            <div class="book-ornament"></div>
-                            <p style="font-family: var(--font-body-ar);">نجيب محفوظ</p>
-                        </div>
-                    </div>
-                    <div class="book-3d">
-                        <div class="book-3d-spine"></div>
-                        <div class="book-3d-content">
-                            <h4 style="font-family: var(--font-display-ar); font-size: 16px;">فن اللامبالاة</h4>
-                            <div class="book-ornament"></div>
-                            <p style="font-family: var(--font-body-ar);">مارك مانسون</p>
-                        </div>
-                    </div>
+                <div class="book-stack" id="heroBookStack" aria-label="عينة من أغلفة الكتب">
+                    <!-- تُملأ بصور assets/books أو أحدث كتب من المتجر -->
                 </div>
                 <div class="hero-sparkle"></div>
                 <div class="hero-sparkle"></div>
@@ -252,8 +229,8 @@
     <!-- Supabase Config -->
     <script src="js/supabase-config.js"></script>
     <script src="js/books-store.js"></script>
+    <script src="js/hero-books.js"></script>
     <script src="js/session.js"></script>
-    <!-- App Logic -->
     <script src="js/main.js"></script>
     <script>
         // Header scroll effect

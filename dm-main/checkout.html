@@ -48,7 +48,7 @@
                 <div class="checkout-card uiglass">
                     <h3 id="shippingTitle">تفاصيل الشحن والتوصيل</h3>
                     
-                    <form id="shippingForm" onsubmit="submitOrder(event)">
+                    <form id="shippingForm" onsubmit="handleCheckoutSubmit(event)">
                         <div class="form-group">
                             <label for="fullName" id="lblFullName">الاسم الكامل للعميل *</label>
                             <input type="text" id="fullName" required placeholder="أدخل اسمك ثلاثي أو رباعي">
@@ -92,6 +92,8 @@
                             </div>
                         </div>
                         
+                        <div id="checkoutMessage" class="auth-message" hidden role="alert"></div>
+
                         <button type="submit" class="btn btn-primary" style="width: 100%; height: 52px; font-size: 17px;" id="btnPlaceOrder">
                             <i class="fa-solid fa-circle-check"></i> تأكيد الطلب وإرسال
                         </button>

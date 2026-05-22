@@ -5,6 +5,7 @@
 1. افتح [Supabase Dashboard](https://supabase.com/dashboard) → مشروعك → **SQL Editor**
 2. انسخ محتوى **`fix-database.sql`** بالكامل والصقه → **Run**
 3. انسخ محتوى **`admin-fix.sql`** والصقه → **Run** (دخول الأدمن + تخزين الصور)
+4. انسخ محتوى **`checkout-fix.sql`** والصقه → **Run** (إصلاح تعليق زر تأكيد الطلب)
 4. من **Authentication → Users** أنشئ مستخدم الأدمن (أو سجّل من الموقع)
 5. نفّذ (استبدل البريد):
 

@@ -119,6 +119,19 @@ const shippingRates = {
     remote: 100
 };
 
+/** مفاتيح ترجمة المحافظات — منفصلة عن منطق الإرسال */
+const GOV_LABEL_KEYS = {
+    cairo: "govCairo",
+    giza: "govGiza",
+    alexandria: "govAlex",
+    delta: "govDelta",
+    upper: "govUpper",
+    remote: "govRemote",
+};
+
+let submitBtnOriginalHtml = "";
+let isSubmittingOrder = false;
+
 document.addEventListener("DOMContentLoaded", async () => {
     if (cart.length === 0) {
         alert(translations[currentLang].cartEmptyAlert);
@@ -301,97 +314,321 @@ function calculateShipping() {
     document.getElementById("summaryTotal").innerText = `${total.toFixed(2)} ${t.currency}`;
 }
 
-// Submit Order to Supabase
-async function submitOrder(e) {
-    e.preventDefault();
-    
+/* ═══════════════════════════════════════════════════════════════
+   منطق الطلب — منفصل عن عرض الواجهة (Separation of Concerns)
+   ═══════════════════════════════════════════════════════════════ */
+
+/** الحصول على عميل Supabase أو رمي خطأ واضح */
+function getCheckoutClient() {
+    const client = window.getSupabaseClient && window.getSupabaseClient();
+    if (!client || !client.from) {
+        throw new Error(
+            currentLang === "ar"
+                ? "تعذر الاتصال بالخادم. حدّث الصفحة وحاول مرة أخرى."
+                : "Cannot connect to server. Refresh and try again."
+        );
+    }
+    return client;
+}
+
+/** تحويل أخطاء Supabase / الشبكة إلى رسالة مفهومة للمستخدم */
+function parseCheckoutError(err) {
     const t = translations[currentLang];
+    if (!err) return t.orderSubmitError;
+
+    const code = err.code || err.error_code || "";
+    const msg = String(err.message || err.msg || err.error_description || "").trim();
+    const details = String(err.details || err.hint || "").trim();
+    const combined = `${msg} ${details}`.toLowerCase();
+
+    const mapAr = {
+        invalid_customer_name: "يرجى إدخال اسم العميل (حرفان على الأقل).",
+        invalid_phone: "يرجى إدخال رقم هاتف صحيح.",
+        invalid_governorate: "يرجى اختيار المحافظة.",
+        invalid_address: "يرجى إدخال العنوان بالتفصيل.",
+        empty_cart: "السلة فارغة. أضف كتباً قبل إتمام الشراء.",
+        "42501": "صلاحيات قاعدة البيانات تمنع إتمام الطلب. شغّل supabase/checkout-fix.sql في SQL Editor.",
+        "23503": "أحد الكتب في السلة لم يعد متوفراً. حدّث السلة وحاول مرة أخرى.",
+        "23505": "طلب مكرر. حاول مرة أخرى بعد لحظات.",
+        PGRST301: "انتهت الجلسة أو مفتاح API غير صالح.",
+        "Failed to fetch": "تعذر الاتصال بالإنترنت. تحقق من الشبكة وحاول مجدداً.",
+        "No data returned": "لم يُرجع السيرفر رقم الطلب. شغّل سكربت checkout-fix.sql.",
+    };
+
+    if (currentLang === "ar") {
+        for (const [key, arMsg] of Object.entries(mapAr)) {
+            if (code === key || combined.includes(key.toLowerCase())) return arMsg;
+        }
+        if (msg.includes("JWT") || msg.includes("API key")) {
+            return "إعدادات Supabase غير صحيحة. راجع مفتاح المشروع.";
+        }
+        return msg || t.orderSubmitError;
+    }
+
+    return msg || details || t.orderSubmitError;
+}
+
+/** تنبيه داخل الصفحة (بديل أو مكمّل لـ alert) */
+function showCheckoutMessage(text, type) {
+    const el = document.getElementById("checkoutMessage");
+    if (!el) {
+        if (text) alert(text);
+        return;
+    }
+    if (!text) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+    }
+    el.textContent = text;
+    el.className = "auth-message" + (type ? ` auth-message--${type}` : "");
+    el.hidden = false;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/** تفعيل / إيقاف حالة تحميل زر الإرسال — تُستدعى دائماً في finally */
+function setSubmitLoading(loading) {
     const submitBtn = document.getElementById("btnPlaceOrder");
-    const originalBtnHtml = submitBtn.innerHTML;
-    
-    // Set loading state
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = t.submitting;
-    
-    const fullName = document.getElementById("fullName").value.trim();
-    const phone = document.getElementById("phone").value.trim();
-    const governorate = document.getElementById("governorate").value;
-    const address = document.getElementById("address").value.trim();
-    const notes = document.getElementById("notes").value.trim();
-    
-    const governorateText = translations[currentLang]["gov" + governorate.charAt(0).toUpperCase() + governorate.slice(1)] || governorate;
-    
-    try {
-        const supabase = window.getSupabaseClient();
-        if (!supabase) throw new Error("Supabase not initialized");
+    if (!submitBtn) return;
 
-        let userId = null;
-        let customerEmail = null;
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            userId = session.user.id;
-            customerEmail = session.user.email;
-        }
+    const t = translations[currentLang];
 
-        const orderPayload = {
-            user_id: userId,
-            customer_name: fullName,
-            customer_phone: phone,
-            customer_email: customerEmail,
-            governorate: governorateText,
-            address: address,
-            notes: notes,
-            total_price: cartSubtotal + shippingCost,
-            shipping_cost: shippingCost,
-            status: "pending"
-        };
-
-        // 1. Insert order record
-        const { data: orderData, error: orderError } = await supabase
-            .from("orders")
-            .insert([orderPayload])
-            .select();
-            
-        if (orderError) throw orderError;
-        if (!orderData || orderData.length === 0) {
-            throw new Error("No data returned from order insertion.");
-        }
-        
-        const createdOrder = orderData[0];
-        const orderId = createdOrder.id;
-        
-        // 2. Prepare and insert order items
-        const orderItemsToInsert = cart.map(item => ({
-            order_id: orderId,
-            book_id: item.id,
-            quantity: item.quantity,
-            price: item.price
-        }));
-        
-        const { error: itemsError } = await supabase
-            .from("order_items")
-            .insert(orderItemsToInsert);
-            
-        if (itemsError) throw itemsError;
-        
-        // Success: Clear cart & show success UI
-        localStorage.removeItem("cart");
-        cart = [];
-        
-        document.getElementById("successOrderID").innerText = orderId;
-        
-        document.getElementById("checkoutFormState").style.display = "none";
-        document.getElementById("checkoutSuccessState").style.display = "block";
-        document.getElementById("checkoutMain").scrollIntoView({ behavior: "smooth" });
-
-        setTimeout(() => {
-            window.location.href = `pages/order-confirmation.html?order=${orderId}`;
-        }, 1800);
-        
-    } catch (err) {
-        console.error("Order submission failure:", err);
-        alert(t.orderSubmitError);
+    if (loading) {
+        if (!submitBtnOriginalHtml) submitBtnOriginalHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.setAttribute("aria-busy", "true");
+        submitBtn.innerHTML = t.submitting;
+    } else {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnHtml;
+        submitBtn.removeAttribute("aria-busy");
+        submitBtn.innerHTML = submitBtnOriginalHtml || t.btnPlaceOrder;
     }
 }
+
+function getGovernorateLabel(code) {
+    const t = translations[currentLang];
+    const key = GOV_LABEL_KEYS[code];
+    return key && t[key] ? t[key] : code;
+}
+
+/** التحقق من الحقول قبل الإرسال */
+function validateCheckoutForm() {
+    const t = translations[currentLang];
+    const fullName = document.getElementById("fullName")?.value.trim() || "";
+    const phone = document.getElementById("phone")?.value.trim() || "";
+    const governorate = document.getElementById("governorate")?.value || "";
+    const address = document.getElementById("address")?.value.trim() || "";
+
+    if (!cart.length) {
+        return { ok: false, message: t.cartEmptyAlert };
+    }
+    if (fullName.length < 2) {
+        return {
+            ok: false,
+            message: currentLang === "ar" ? "يرجى إدخال الاسم الكامل." : "Please enter your full name.",
+        };
+    }
+    if (phone.length < 8) {
+        return {
+            ok: false,
+            message: currentLang === "ar" ? "يرجى إدخال رقم هاتف صحيح." : "Please enter a valid phone number.",
+        };
+    }
+    if (!governorate) {
+        return {
+            ok: false,
+            message: currentLang === "ar" ? "يرجى اختيار المحافظة." : "Please select a governorate.",
+        };
+    }
+    if (!shippingRates[governorate]) {
+        return {
+            ok: false,
+            message: currentLang === "ar" ? "محافظة غير صالحة." : "Invalid governorate.",
+        };
+    }
+    if (address.length < 5) {
+        return {
+            ok: false,
+            message: currentLang === "ar" ? "يرجى إدخال العنوان بالتفصيل." : "Please enter your full address.",
+        };
+    }
+
+    return {
+        ok: true,
+        data: { fullName, phone, governorate, address, notes: document.getElementById("notes")?.value.trim() || "" },
+    };
+}
+
+/** بناء payload الطلب */
+function buildOrderPayload(formData, session) {
+    return {
+        user_id: session?.user?.id || null,
+        customer_name: formData.fullName,
+        customer_phone: formData.phone,
+        customer_email: session?.user?.email || null,
+        governorate: getGovernorateLabel(formData.governorate),
+        address: formData.address,
+        notes: formData.notes,
+        total_price: Number((cartSubtotal + shippingCost).toFixed(2)),
+        shipping_cost: shippingCost,
+        status: "pending",
+        items: cart.map((item) => ({
+            book_id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+        })),
+    };
+}
+
+/** الطريقة المفضلة: RPC آمن (يتجاوز مشكلة RLS على SELECT بعد INSERT للضيف) */
+async function placeOrderViaRpc(supabase, payload) {
+    const { data, error } = await supabase.rpc("place_order", {
+        p_customer_name: payload.customer_name,
+        p_customer_phone: payload.customer_phone,
+        p_customer_email: payload.customer_email,
+        p_governorate: payload.governorate,
+        p_address: payload.address,
+        p_notes: payload.notes || "",
+        p_total_price: payload.total_price,
+        p_shipping_cost: payload.shipping_cost,
+        p_user_id: payload.user_id,
+        p_items: payload.items,
+    });
+
+    if (error) throw error;
+
+    const orderId = data?.order_id || data?.orderId;
+    if (!orderId) {
+        throw new Error("No order_id returned from place_order RPC");
+    }
+    return String(orderId);
+}
+
+/** احتياطي: إدراج مباشر (قد يفشل SELECT للضيف بدون checkout-fix.sql) */
+async function placeOrderDirect(supabase, payload) {
+    const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+            {
+                user_id: payload.user_id,
+                customer_name: payload.customer_name,
+                customer_phone: payload.customer_phone,
+                customer_email: payload.customer_email,
+                governorate: payload.governorate,
+                address: payload.address,
+                notes: payload.notes,
+                total_price: payload.total_price,
+                shipping_cost: payload.shipping_cost,
+                status: payload.status,
+            },
+        ])
+        .select("id");
+
+    if (orderError) throw orderError;
+    if (!orderData?.length) {
+        throw new Error("No data returned from order insertion.");
+    }
+
+    const orderId = orderData[0].id;
+    const orderItems = payload.items.map((item) => ({
+        order_id: orderId,
+        book_id: item.book_id,
+        quantity: item.quantity,
+        price: item.price,
+    }));
+
+    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+    if (itemsError) throw itemsError;
+
+    return String(orderId);
+}
+
+async function createOrder(payload) {
+    const supabase = getCheckoutClient();
+
+    try {
+        return await placeOrderViaRpc(supabase, payload);
+    } catch (rpcErr) {
+        const rpcMsg = String(rpcErr?.message || rpcErr?.code || "").toLowerCase();
+        const rpcMissing =
+            rpcMsg.includes("place_order") ||
+            rpcMsg.includes("function") ||
+            rpcMsg.includes("does not exist") ||
+            rpcErr?.code === "42883";
+
+        if (!rpcMissing) throw rpcErr;
+
+        console.warn("place_order RPC unavailable, using direct insert:", rpcErr);
+        return await placeOrderDirect(supabase, payload);
+    }
+}
+
+function showCheckoutSuccess(orderId) {
+    const successIdEl = document.getElementById("successOrderID");
+    if (successIdEl) successIdEl.innerText = orderId;
+
+    const formState = document.getElementById("checkoutFormState");
+    const successState = document.getElementById("checkoutSuccessState");
+    if (formState) formState.style.display = "none";
+    if (successState) successState.style.display = "block";
+
+    document.getElementById("checkoutMain")?.scrollIntoView({ behavior: "smooth" });
+
+    setTimeout(() => {
+        window.location.href = `pages/order-confirmation.html?order=${encodeURIComponent(orderId)}`;
+    }, 1800);
+}
+
+/** تنفيذ إرسال الطلب — مع try/catch/finally كامل */
+async function submitOrder() {
+    if (isSubmittingOrder) return;
+
+    showCheckoutMessage("");
+    const validation = validateCheckoutForm();
+    if (!validation.ok) {
+        showCheckoutMessage(validation.message, "error");
+        return;
+    }
+
+    isSubmittingOrder = true;
+    setSubmitLoading(true);
+
+    try {
+        const supabase = getCheckoutClient();
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
+
+        const payload = buildOrderPayload(validation.data, session);
+        const orderId = await createOrder(payload);
+
+        localStorage.removeItem("cart");
+        cart = [];
+        showCheckoutSuccess(orderId);
+    } catch (err) {
+        console.error("Order submission failure:", err);
+        const friendly = parseCheckoutError(err);
+        showCheckoutMessage(friendly, "error");
+    } finally {
+        isSubmittingOrder = false;
+        setSubmitLoading(false);
+    }
+}
+
+/**
+ * غلاف النموذج — يمنع Uncaught (in promise) من onsubmit مع دالة async
+ */
+function handleCheckoutSubmit(e) {
+    e.preventDefault();
+    submitOrder().catch((err) => {
+        console.error("Unhandled checkout rejection:", err);
+        const friendly = parseCheckoutError(err);
+        showCheckoutMessage(friendly, "error");
+        isSubmittingOrder = false;
+        setSubmitLoading(false);
+    });
+    return false;
+}
+
+window.handleCheckoutSubmit = handleCheckoutSubmit;
+window.submitOrder = submitOrder;

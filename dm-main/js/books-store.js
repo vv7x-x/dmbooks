@@ -80,15 +80,20 @@
     if (inflightFetch) return inflightFetch;
 
     inflightFetch = (async () => {
+      const run = window.dmApiGuard?.runRequest
+        ? (label, fn) => window.dmApiGuard.runRequest(label, fn)
+        : async (label, fn) => {
+            const r = await fn();
+            if (r?.error) throw r.error;
+            return r;
+          };
+
       const sb = window.getSupabaseClient && window.getSupabaseClient();
       if (!sb) throw new Error("Supabase not ready");
 
-      const { data, error } = await sb
-        .from("books")
-        .select(LIST_COLUMNS)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const { data } = await run("books.list", () =>
+        sb.from("books").select(LIST_COLUMNS).order("created_at", { ascending: false })
+      );
 
       const list = data || [];
       writeCache(list);
@@ -97,6 +102,12 @@
 
     try {
       return await inflightFetch;
+    } catch (err) {
+      const normalized = window.dmApiGuard?.normalizeError
+        ? window.dmApiGuard.normalizeError(err)
+        : err;
+      console.error("[dmBooks] fetchBooksList:", normalized);
+      throw normalized;
     } finally {
       inflightFetch = null;
     }
@@ -104,7 +115,10 @@
 
   function prefetchBooksList() {
     if (readCache()?.length) return Promise.resolve({ data: readCache(), fromCache: true });
-    return fetchBooksList().catch(() => null);
+    return fetchBooksList().catch((err) => {
+      console.warn("[dmBooks] prefetch:", window.dmApiGuard?.normalizeError?.(err) || err);
+      return null;
+    });
   }
 
   async function fetchBookById(id) {

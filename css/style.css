@@ -511,8 +511,41 @@ body.en-mode .hero-content h1 {
     box-shadow: inset -2px 0 6px rgba(0, 0, 0, 0.25);
 }
 
-.book-cover-3d--failed {
-    display: none;
+/* غلاف بديل عند غياب الصورة — بدون طلب HTTP */
+.book-cover-face--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, var(--walnut), var(--walnut-light));
+}
+
+.book-cover-placeholder-inner {
+    text-align: center;
+    color: var(--gold);
+    padding: 1rem;
+    font-size: 0.85rem;
+}
+
+.book-cover-placeholder-inner i {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.85;
+}
+
+#catalogStatusBanner {
+    margin: 0 auto 1.25rem;
+    max-width: 720px;
+    text-align: center;
+}
+
+.book-card-img--no-photo {
+    background: linear-gradient(160deg, var(--parchment-dark), var(--linen));
+    min-height: 280px;
+}
+
+.book-img-broken {
+    visibility: hidden;
 }
 
 .hero-books-placeholder {

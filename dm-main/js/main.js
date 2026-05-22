@@ -118,7 +118,8 @@ let renderGridToken = 0;
 let cart = JSON.parse(localStorage.getItem("cart")) || [];
 let wishlist = JSON.parse(localStorage.getItem("wishlist")) || [];
 
-const BOOK_RENDER_BATCH = 12;
+const BOOK_RENDER_BATCH = 24;
+const SKELETON_COUNT = 6;
 const CATEGORY_LABEL_KEYS = {
     novels: "catNovels",
     religious: "catReligious",
@@ -143,10 +144,60 @@ function debounce(fn, ms) {
     };
 }
 
+function hydrateBooksFromCache() {
+    if (!window.dmBooks) return false;
+    const cached = window.dmBooks.readPersistentCache() || window.dmBooks.readCache();
+    if (!cached?.length) return false;
+    allBooks = cached;
+    booksReady = true;
+    return true;
+}
+
+/** رسالة خطأ في شبكة الكتالوج */
+function showCatalogBanner(message, type) {
+    let el = document.getElementById("catalogStatusBanner");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "catalogStatusBanner";
+        el.setAttribute("role", "alert");
+        const catalog = document.getElementById("catalog");
+        const grid = document.getElementById("booksGrid");
+        if (catalog && grid) catalog.insertBefore(el, grid);
+    }
+    if (!message) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+    }
+    el.textContent = message;
+    el.className = "auth-message" + (type ? ` auth-message--${type}` : "");
+    el.hidden = false;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     applyLanguage(currentLang);
-    showBooksSkeleton();
-    loadBooksFromDB();
+    showCatalogBanner("");
+
+    if (hydrateBooksFromCache()) {
+        renderBooksGrid();
+        window.dmHeroBooks?.updateHeroFromBooks(allBooks);
+    } else {
+        showBooksSkeleton(SKELETON_COUNT);
+    }
+
+    loadBooksFromDB().catch((err) => {
+        const msg = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err).message
+            : String(err?.message || err);
+        console.error("[index] loadBooks:", err);
+        showCatalogBanner(msg, "error");
+        showBooksLoadError(msg);
+    });
+
+    window.dmHeroBooks?.initHeroBooks()?.catch?.((err) => {
+        console.warn("[index] hero:", err);
+    });
+
     updateCartCount();
     updateWishlistCount();
     requestAnimationFrame(() => {
@@ -154,6 +205,13 @@ document.addEventListener("DOMContentLoaded", () => {
         renderWishlist();
         initHeroParallax();
     });
+});
+
+window.dmApiGuard?.installUnhandledRejectionGuard?.("index", (err) => {
+    booksLoading = false;
+    const msg = err.message || "خطأ في التحميل";
+    showCatalogBanner(msg, "error");
+    if (!allBooks.length) showBooksLoadError(msg);
 });
 
 window.filterBooksDebounced = debounce(filterBooks, 280);
@@ -258,7 +316,7 @@ function applyLanguage(lang) {
     safeSetText("footerCOD", t.footerCOD);
 }
 
-function showBooksSkeleton(count = 8) {
+function showBooksSkeleton(count = SKELETON_COUNT) {
     const grid = document.getElementById("booksGrid");
     if (!grid) return;
     booksLoading = true;
@@ -299,35 +357,34 @@ function showBooksLoadError(message) {
 async function loadBooksFromDB(forceRefresh = false) {
     const grid = document.getElementById("booksGrid");
     if (!grid || !window.dmBooks) {
-        showBooksLoadError("تعذر تهيئة التطبيق. حدّث الصفحة.");
+        const msg = "تعذر تهيئة التطبيق. حدّث الصفحة.";
+        showBooksLoadError(msg);
+        showCatalogBanner(msg, "error");
         return;
     }
 
-    if (!booksReady) showBooksSkeleton();
+    booksLoading = true;
+    showCatalogBanner("");
+    if (!booksReady && !forceRefresh) showBooksSkeleton(SKELETON_COUNT);
 
     try {
-        if (!forceRefresh) {
-            const cached = window.dmBooks.readCache();
-            if (cached && cached.length) {
-                allBooks = cached;
-                booksReady = true;
-                renderBooksGrid();
-            }
-        }
-
         const { data } = await window.dmBooks.fetchBooksList({ force: forceRefresh });
-        allBooks = data;
+        allBooks = data || [];
         booksReady = true;
         renderBooksGrid();
+        window.dmHeroBooks?.updateHeroFromBooks(allBooks);
     } catch (err) {
-        console.error("Error loading books:", err);
-        if (!allBooks.length) {
-            showBooksLoadError(
-                currentLang === "ar"
-                    ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
-                    : "Failed to load books. Check your connection and retry."
-            );
-        }
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[index] Error loading books:", normalized);
+        const msg =
+            normalized.message ||
+            (currentLang === "ar"
+                ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
+                : "Failed to load books. Check your connection and retry.");
+        showCatalogBanner(msg, "error");
+        if (!allBooks.length) showBooksLoadError(msg);
     } finally {
         booksLoading = false;
     }
@@ -390,9 +447,13 @@ function buildBookCardHtml(book, t) {
     let coverImgHtml = "";
     if (book.image_url) {
         const src = window.dmBooks
-            ? window.dmBooks.bookCoverUrl(book.image_url, 420)
+            ? window.dmBooks.bookCoverUrl(book.image_url, 300)
             : book.image_url;
-        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="280" height="400" loading="lazy" decoding="async" fetchpriority="low">`;
+        const eager = typeof buildBookCardHtml.eagerCount === "number" && buildBookCardHtml.eagerCount < 8;
+        if (eager) buildBookCardHtml.eagerCount++;
+        else if (buildBookCardHtml.eagerCount === undefined) buildBookCardHtml.eagerCount = 0;
+        const loadAttr = eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy" fetchpriority="low"';
+        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="280" height="400" decoding="async" ${loadAttr} onerror="this.classList.add('book-img-broken');this.style.visibility='hidden';this.parentElement?.classList.add('book-card-img--no-photo');">`;
     } else {
         coverImgHtml = `
             <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--forest-light) 0%, var(--forest) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #fff; text-align: center; border-left: 6px solid rgba(255,255,255,0.1);">
@@ -427,9 +488,14 @@ function buildBookCardHtml(book, t) {
 }
 
 function renderBooksGridChunked(grid, books, t, token) {
+    buildBookCardHtml.eagerCount = 0;
+    if (books.length <= BOOK_RENDER_BATCH) {
+        grid.innerHTML = books.map((book) => buildBookCardHtml(book, t)).join("");
+        grid.classList.add("books-grid-fade-in");
+        return;
+    }
     grid.innerHTML = "";
     let index = 0;
-
     function appendBatch() {
         if (token !== renderGridToken) return;
         const slice = books.slice(index, index + BOOK_RENDER_BATCH);
@@ -437,16 +503,11 @@ function renderBooksGridChunked(grid, books, t, token) {
             grid.classList.add("books-grid-fade-in");
             return;
         }
-        const html = slice.map((book) => buildBookCardHtml(book, t)).join("");
-        grid.insertAdjacentHTML("beforeend", html);
+        grid.insertAdjacentHTML("beforeend", slice.map((book) => buildBookCardHtml(book, t)).join(""));
         index += BOOK_RENDER_BATCH;
-        if (index < books.length) {
-            requestAnimationFrame(appendBatch);
-        } else {
-            grid.classList.add("books-grid-fade-in");
-        }
+        if (index < books.length) requestAnimationFrame(appendBatch);
+        else grid.classList.add("books-grid-fade-in");
     }
-
     requestAnimationFrame(appendBatch);
 }
 
@@ -456,6 +517,7 @@ function renderBooksGrid() {
 
     if (booksLoading && !booksReady) return;
 
+    buildBookCardHtml.eagerCount = 0;
     const t = translations[currentLang];
     const token = ++renderGridToken;
 
@@ -577,7 +639,10 @@ function renderCart() {
         
         let coverImgHtml = "";
         if (item.image_url) {
-            coverImgHtml = `<img src="${item.image_url}" alt="${item.title}">`;
+            const src = window.dmBooks
+                ? window.dmBooks.bookCoverUrl(item.image_url, 120)
+                : item.image_url;
+            coverImgHtml = `<img src="${src}" alt="${item.title}" width="80" height="100" loading="lazy" decoding="async">`;
         } else {
             coverImgHtml = `<div style="width:100%; height:100%; background:var(--forest); display:flex; align-items:center; justify-content:center; color:var(--gold); font-size:16px; font-weight:700;"><i class="fa-solid fa-book-open"></i></div>`;
         }
@@ -682,7 +747,7 @@ function renderWishlist() {
 
 function initHeroParallax() {
     const heroVisual = document.querySelector('.hero-visual');
-    const bookStack = document.querySelector('.book-stack');
+    const bookStack = document.getElementById('heroBookStack') || document.querySelector('.book-stack');
     if (!heroVisual || !bookStack) return;
 
     heroVisual.addEventListener('mousemove', (event) => {

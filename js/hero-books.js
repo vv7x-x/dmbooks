@@ -1,13 +1,11 @@
 /**
- * كتب الهيرو — صور من assets/books أو أحدث كتب من الكتالوج
+ * كتب الهيرو — صور محلية (بدون 404) أو من كتالوج Supabase
  */
 (function () {
   const MANIFEST_URL = "assets/books/manifest.json";
-  const DEFAULT_COVERS = [
-    "assets/books/cover-1.jpg",
-    "assets/books/cover-2.jpg",
-    "assets/books/cover-3.jpg",
-  ];
+
+  /** لا تُخمَّن مسارات .jpg — تُقرأ فقط من manifest لتجنب 404 */
+  const FALLBACK_MANIFEST_PATHS = ["assets/books/Cover-1.jpg.png"];
 
   function resolveCoverUrl(url, width) {
     if (!url) return "";
@@ -17,55 +15,134 @@
     return url;
   }
 
-  function buildCoverEl(src, alt, index) {
+  /** غلاف CSS عند غياب الصورة */
+  function buildPlaceholderFace(title, author) {
+    const face = document.createElement("div");
+    face.className = "book-cover-face book-cover-face--placeholder";
+    face.innerHTML = `
+      <div class="book-cover-placeholder-inner">
+        <i class="fa-solid fa-book" aria-hidden="true"></i>
+        <span>${title || ""}</span>
+      </div>`;
+    return face;
+  }
+
+  function buildCoverEl(item, index) {
     const wrap = document.createElement("div");
     wrap.className = "book-cover-3d";
     wrap.style.setProperty("--book-i", String(index));
-    wrap.innerHTML = `
-      <div class="book-cover-spine" aria-hidden="true"></div>
-      <div class="book-cover-face">
-        <img src="${src}" alt="${alt || ""}" width="210" height="298" loading="${index === 1 ? "eager" : "lazy"}" decoding="async" fetchpriority="${index === 1 ? "high" : "low"}">
-      </div>`;
-    const img = wrap.querySelector("img");
-    img.addEventListener("error", () => wrap.classList.add("book-cover-3d--failed"));
+
+    const spine = document.createElement("div");
+    spine.className = "book-cover-spine";
+    spine.setAttribute("aria-hidden", "true");
+    wrap.appendChild(spine);
+
+    const face = document.createElement("div");
+    face.className = "book-cover-face";
+    wrap.appendChild(face);
+
+    if (!item?.src) {
+      face.replaceWith(buildPlaceholderFace(item?.alt, ""));
+      return wrap;
+    }
+
+    const img = document.createElement("img");
+    img.alt = item.alt || "";
+    img.width = 210;
+    img.height = 298;
+    img.decoding = "async";
+    img.loading = index === 1 ? "eager" : "lazy";
+    img.fetchPriority = index === 1 ? "high" : "low";
+    img.src = item.src;
+
+    img.addEventListener("error", () => {
+      img.remove();
+      face.innerHTML = "";
+      face.appendChild(buildPlaceholderFace(item.alt, ""));
+    });
+
+    face.appendChild(img);
     return wrap;
   }
 
-  function renderStack(urls) {
+  function renderStack(items) {
     const stack = document.getElementById("heroBookStack");
     if (!stack) return;
     stack.innerHTML = "";
-    urls.slice(0, 3).forEach((item, i) => {
-      if (!item?.src) return;
-      stack.appendChild(buildCoverEl(item.src, item.alt, i + 1));
-    });
-    if (!stack.children.length) {
+
+    const list = (items || []).filter((x) => x).slice(0, 3);
+    if (!list.length) {
       stack.innerHTML = `<div class="hero-books-placeholder" aria-hidden="true"><i class="fa-solid fa-book-open"></i></div>`;
+      return;
     }
+
+    list.forEach((item, i) => {
+      stack.appendChild(buildCoverEl(item, i + 1));
+    });
   }
 
+  /** اختبار مسار صورة — أول مسار يعمل يُستخدم (بدون طلبات لملفات غير موجودة في القائمة النهائية) */
   function probeImage(url) {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve(url);
-      img.onerror = () => resolve(null);
+      const done = (ok) => {
+        img.onload = null;
+        img.onerror = null;
+        resolve(ok ? url : null);
+      };
+      img.onload = () => done(true);
+      img.onerror = () => done(false);
       img.src = url;
     });
   }
 
-  async function loadAssetCovers() {
-    let paths = DEFAULT_COVERS;
+  async function resolveFirstAvailable(paths) {
+    for (const p of paths) {
+      const ok = await probeImage(p);
+      if (ok) return ok;
+    }
+    return null;
+  }
+
+  async function loadManifestPaths() {
     try {
       const res = await fetch(MANIFEST_URL, { cache: "force-cache" });
-      if (res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json.covers) && json.covers.length) paths = json.covers;
+      if (!res.ok) return FALLBACK_MANIFEST_PATHS;
+      const json = await res.json();
+      if (Array.isArray(json.covers) && json.covers.length) {
+        return [...new Set(json.covers)];
       }
-    } catch {
-      /* use defaults */
+    } catch (err) {
+      console.warn("[hero-books] manifest:", err);
     }
-    const checked = await Promise.all(paths.slice(0, 3).map(probeImage));
-    return checked.filter(Boolean).map((src, i) => ({ src, alt: "" }));
+    return FALLBACK_MANIFEST_PATHS;
+  }
+
+  /** ملء المكدس حتى 3 عناصر — غلاف حقيقي أو placeholder بدون طلب HTTP فاشل */
+  function padStackItems(items) {
+    const out = [...items];
+    while (out.length < 3) {
+      out.push({ src: null, alt: "" });
+    }
+    return out.slice(0, 3);
+  }
+
+  async function loadAssetCovers() {
+    const allPaths = await loadManifestPaths();
+    const found = [];
+    const used = new Set();
+
+    for (const path of allPaths) {
+      if (found.length >= 3) break;
+      if (used.has(path)) continue;
+      const ok = await resolveFirstAvailable([path]);
+      if (ok && !used.has(ok)) {
+        used.add(ok);
+        found.push({ src: ok, alt: "" });
+      }
+    }
+
+    return padStackItems(found);
   }
 
   function coversFromCatalog(books) {
@@ -80,47 +157,40 @@
   }
 
   async function initHeroBooks() {
-    const assetCovers = await loadAssetCovers();
-    if (assetCovers.length >= 3) {
-      renderStack(assetCovers);
-      return;
-    }
-    const catalog = window.dmBooks?.readPersistentCache?.() || window.dmBooks?.readCache?.();
-    const fromDb = coversFromCatalog(catalog);
-    if (fromDb.length) {
+    try {
+      const assetCovers = await loadAssetCovers();
+      const catalog =
+        window.dmBooks?.readPersistentCache?.() || window.dmBooks?.readCache?.() || [];
+      const fromDb = coversFromCatalog(catalog);
+
       const merged = [...assetCovers];
       for (const c of fromDb) {
         if (merged.length >= 3) break;
         if (!merged.some((m) => m.src === c.src)) merged.push(c);
       }
-      renderStack(merged);
-      return;
+
+      renderStack(padStackItems(merged));
+    } catch (err) {
+      console.error("[hero-books] init:", err);
+      renderStack([]);
     }
-    if (assetCovers.length) renderStack(assetCovers);
-    else renderStack([]);
   }
 
   function updateHeroFromBooks(books) {
-    const stack = document.getElementById("heroBookStack");
-    if (!stack) return;
-    const hasRealImg = stack.querySelector("img:not([src=''])");
-    const failedOnly = stack.querySelectorAll(".book-cover-3d--failed").length;
-    if (hasRealImg && failedOnly === 0 && stack.querySelectorAll("img").length >= 3) return;
+    try {
+      const fromDb = coversFromCatalog(books);
+      if (!fromDb.length) return;
 
-    const assetCovers = [];
-    stack.querySelectorAll("img").forEach((img) => {
-      if (img.src && !img.closest(".book-cover-3d--failed") && img.src.includes("/assets/books/")) {
-        assetCovers.push({ src: img.src, alt: img.alt });
-      }
-    });
+      const stack = document.getElementById("heroBookStack");
+      if (!stack) return;
 
-    const fromDb = coversFromCatalog(books);
-    const merged = [...assetCovers];
-    for (const c of fromDb) {
-      if (merged.length >= 3) break;
-      if (!merged.some((m) => m.src === c.src)) merged.push(c);
+      const existing = stack.querySelectorAll("img").length;
+      if (existing >= 3) return;
+
+      renderStack(padStackItems(fromDb));
+    } catch (err) {
+      console.error("[hero-books] update:", err);
     }
-    if (merged.length) renderStack(merged);
   }
 
   window.dmHeroBooks = { initHeroBooks, updateHeroFromBooks, renderStack };

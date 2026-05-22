@@ -216,6 +216,38 @@ function getSb() {
     return client;
 }
 
+/** تنفيذ طلب Supabase عبر طبقة الحماية — يرمي خطأً واضحاً عند الفشل */
+async function adminRun(label, requestFn) {
+    if (window.dmApiGuard?.runRequest) {
+        return window.dmApiGuard.runRequest(label, requestFn);
+    }
+    const result = await requestFn();
+    if (result?.error) throw result.error;
+    return result;
+}
+
+/** رسالة تنبيهية أعلى محتوى لوحة التحكم */
+function showAdminDashboardAlert(text, type) {
+    let el = document.getElementById("adminDashboardAlert");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "adminDashboardAlert";
+        el.setAttribute("role", "alert");
+        el.className = "admin-dashboard-alert";
+        const content = document.querySelector(".admin-content");
+        if (content) content.prepend(el);
+    }
+    if (!el) return;
+    if (!text) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+    }
+    el.textContent = text;
+    el.className = "admin-dashboard-alert" + (type ? ` admin-dashboard-alert--${type}` : "");
+    el.hidden = false;
+}
+
 function showAdminLoginMessage(text, type) {
     const el = document.getElementById("adminLoginMessage");
     if (!el) {
@@ -356,68 +388,98 @@ async function checkAuthSession() {
         if (error) throw error;
         await handleAdminSession(session);
     } catch (err) {
-        showAdminLoginMessage(
-            currentLang === "ar"
-                ? "تعذر الاتصال بقاعدة البيانات. تأكد من إعداد Supabase."
-                : "Database connection failed.",
-            "error"
-        );
+        const msg = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err).message
+            : currentLang === "ar"
+              ? "تعذر الاتصال بقاعدة البيانات. تأكد من إعداد Supabase."
+              : "Database connection failed.";
+        console.error("[admin] checkAuthSession:", err);
+        showAdminLoginMessage(msg, "error");
         toggleUIState(false);
         return;
     }
 
-    sb.auth.onAuthStateChange(async (_event, session) => {
-        await handleAdminSession(session);
+    // معالجة تغيّر الجلسة — منع Uncaught (in promise) الذي يُفرغ اللوحة
+    sb.auth.onAuthStateChange((_event, session) => {
+        handleAdminSession(session).catch((err) => {
+            console.error("[admin] onAuthStateChange:", err);
+            const normalized = window.dmApiGuard?.normalizeError
+                ? window.dmApiGuard.normalizeError(err)
+                : err;
+            showAdminDashboardAlert(normalized.message, "error");
+            if (window.dmApiGuard?.isFetchError?.(err)) {
+                toggleUIState(false);
+                showAdminLoginMessage(normalized.message, "error");
+            }
+        });
     });
 }
 
 async function handleAdminSession(session) {
-    if (!session) {
+    try {
+        showAdminDashboardAlert("");
+        if (!session) {
+            toggleUIState(false);
+            return;
+        }
+        const isAdmin = await checkIfAdmin(session.user.id);
+        if (!isAdmin) {
+            const msg =
+                currentLang === "ar"
+                    ? "هذا الحساب غير مخوّل."
+                    : "Unauthorized access.";
+            showAdminLoginMessage(msg, "error");
+            try {
+                await getSb().auth.signOut();
+            } catch (e) {
+                console.warn("[admin] signOut:", e);
+            }
+            toggleUIState(false);
+            return;
+        }
+        showAdminLoginMessage("");
+        toggleUIState(true);
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] handleAdminSession:", normalized);
+        showAdminLoginMessage(normalized.message, "error");
         toggleUIState(false);
-        return;
     }
-    const isAdmin = await checkIfAdmin(session.user.id);
-    if (!isAdmin) {
-        const msg =
-            currentLang === "ar"
-                ? "هذا الحساب غير مخوّل."
-                : "Unauthorized access.";
-        showAdminLoginMessage(msg, "error");
-        try { await getSb().auth.signOut(); } catch (e) {}
-        toggleUIState(false);
-        return;
-    }
-    showAdminLoginMessage("");
-    toggleUIState(true);
 }
 
 async function checkIfAdmin(uid) {
     if (!uid) return false;
-    try {
-        const sb = getSb();
-        const { data: rpcOk, error: rpcErr } = await sb.rpc("check_is_admin");
-        if (!rpcErr && rpcOk === true) return true;
+    const sb = getSb();
 
-        const { data: adminRow, error: e1 } = await sb.from("admin_users").select("user_id").eq("user_id", uid).maybeSingle();
-        if (!e1 && adminRow) return true;
+    const { data: rpcOk } = await adminRun("admin.check_is_admin", () => sb.rpc("check_is_admin"));
+    if (rpcOk === true) return true;
 
-        const { data: profile, error: e2 } = await sb.from("profiles").select("is_admin").eq("id", uid).maybeSingle();
-        if (!e2 && profile?.is_admin) return true;
+    const { data: adminRow } = await adminRun("admin.admin_users", () =>
+        sb.from("admin_users").select("user_id").eq("user_id", uid).maybeSingle()
+    );
+    if (adminRow) return true;
 
-        return false;
-    } catch (err) {
-        return false;
-    }
+    const { data: profile } = await adminRun("admin.profiles", () =>
+        sb.from("profiles").select("is_admin").eq("id", uid).maybeSingle()
+    );
+    return !!profile?.is_admin;
 }
 
 function toggleUIState(isLoggedIn) {
+    const loginEl = document.getElementById("adminLoginState");
+    const dashEl = document.getElementById("adminDashboardState");
+    if (!loginEl || !dashEl) return;
+
     if (isLoggedIn) {
-        document.getElementById("adminLoginState").style.display = "none";
-        document.getElementById("adminDashboardState").style.display = "grid";
+        loginEl.style.display = "none";
+        dashEl.style.display = "grid";
         switchTab(activeTab);
     } else {
-        document.getElementById("adminLoginState").style.display = "block";
-        document.getElementById("adminDashboardState").style.display = "none";
+        loginEl.style.display = "block";
+        dashEl.style.display = "none";
+        showAdminDashboardAlert("");
     }
 }
 
@@ -435,8 +497,9 @@ async function loginAdmin(e) {
     try {
         showAdminLoginMessage("");
         const sb = getSb();
-        const { data, error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const { data } = await adminRun("admin.signIn", () =>
+            sb.auth.signInWithPassword({ email, password })
+        );
 
         const isAdmin = await checkIfAdmin(data.user?.id);
         if (!isAdmin) {
@@ -451,9 +514,16 @@ async function loginAdmin(e) {
         }
         await handleAdminSession(data.session);
     } catch (err) {
-        const msg = err.message?.includes("Invalid login")
-                ? (currentLang === "ar" ? "البريد أو كلمة المرور غير صحيحة." : "Invalid email or password.")
-                : (currentLang === "ar" ? "فشل تسجيل الدخول." : "Login failed.");
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] login:", normalized);
+        const msg = String(normalized.message || "").includes("Invalid login")
+            ? currentLang === "ar"
+                ? "البريد أو كلمة المرور غير صحيحة."
+                : "Invalid email or password."
+            : normalized.message ||
+              (currentLang === "ar" ? "فشل تسجيل الدخول." : "Login failed.");
         showAdminLoginMessage(msg, "error");
     } finally {
         loginBtn.disabled = false;
@@ -483,20 +553,27 @@ function switchTab(tab) {
 async function loadOrders() {
     const tbody = document.getElementById("ordersTableBody");
     const t = translations[currentLang];
-    
+    if (!tbody) return;
+
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">${t.loading}</td></tr>`;
-    
+    showAdminDashboardAlert("");
+
     try {
-        const { data, error } = await getSb()
-            .from("orders")
-            .select("*")
-            .order("created_at", { ascending: false });
-            
-        if (error) throw error;
+        const { data } = await adminRun("admin.orders.list", () =>
+            getSb().from("orders").select("*").order("created_at", { ascending: false })
+        );
         currentOrders = data || [];
-        filterOrders(); // Render with current filters if any
+        filterOrders();
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger);">خطأ في تحميل البيانات.</td></tr>`;
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] loadOrders:", normalized);
+        const msg =
+            normalized.message ||
+            (currentLang === "ar" ? "خطأ في تحميل الطلبات." : "Failed to load orders.");
+        showAdminDashboardAlert(msg, "error");
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger);">${msg}</td></tr>`;
     }
 }
 
@@ -615,20 +692,27 @@ function exportOrdersToCSV() {
 async function loadBooks() {
     const tbody = document.getElementById("booksTableBody");
     const t = translations[currentLang];
-    
+    if (!tbody) return;
+
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">${t.loading}</td></tr>`;
-    
+    showAdminDashboardAlert("");
+
     try {
-        const { data, error } = await getSb()
-            .from("books")
-            .select("*")
-            .order("created_at", { ascending: false });
-            
-        if (error) throw error;
+        const { data } = await adminRun("admin.books.list", () =>
+            getSb().from("books").select("*").order("created_at", { ascending: false })
+        );
         currentBooks = data || [];
         filterBooks();
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--danger);">خطأ في تحميل البيانات.</td></tr>`;
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] loadBooks:", normalized);
+        const msg =
+            normalized.message ||
+            (currentLang === "ar" ? "خطأ في تحميل الكتب." : "Failed to load books.");
+        showAdminDashboardAlert(msg, "error");
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--danger);">${msg}</td></tr>`;
     }
 }
 
@@ -666,7 +750,7 @@ function renderBooksTable(booksToRender = currentBooks) {
             const thumb = window.dmBooks?.bookCoverUrl && book.image_url.includes("supabase.co/storage")
                     ? window.dmBooks.bookCoverUrl(book.image_url, 80)
                     : book.image_url;
-            coverHtml = `<img src="${thumb}" alt="${book.title}" class="admin-table-img" loading="lazy" decoding="async">`;
+            coverHtml = `<img src="${thumb}" alt="${book.title}" class="admin-table-img" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'admin-table-img admin-cover-placeholder',innerHTML:'<i class=\\'fa-solid fa-book-open\\'></i>'}))">`;
         } else {
             coverHtml = `<div class="admin-table-img admin-cover-placeholder"><i class="fa-solid fa-book-open"></i></div>`;
         }
@@ -701,13 +785,17 @@ function renderBooksTable(booksToRender = currentBooks) {
 
 async function toggleBookStock(bookId, currentVal) {
     try {
-        const { error } = await getSb().from("books").update({ in_stock: !currentVal }).eq("id", bookId);
-        if (error) throw error;
-        
+        await adminRun("admin.books.stock", () =>
+            getSb().from("books").update({ in_stock: !currentVal }).eq("id", bookId)
+        );
         const book = currentBooks.find(b => b.id === bookId);
         if (book) book.in_stock = !currentVal;
         filterBooks();
-    } catch (err) {}
+    } catch (err) {
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
+        console.error("[admin] toggleBookStock:", err);
+        showAdminDashboardAlert(msg, "error");
+    }
 }
 
 async function deleteBook(bookId) {
@@ -715,12 +803,14 @@ async function deleteBook(bookId) {
     if (!confirm(t.bookDeleteConfirm)) return;
     
     try {
-        const { error } = await getSb().from("books").delete().eq("id", bookId);
-        if (error) throw error;
-        
+        await adminRun("admin.books.delete", () => getSb().from("books").delete().eq("id", bookId));
         currentBooks = currentBooks.filter(b => b.id !== bookId);
         filterBooks();
-    } catch (err) {}
+    } catch (err) {
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
+        console.error("[admin] deleteBook:", err);
+        alert(msg);
+    }
 }
 
 function openAddBookModal() { document.getElementById("addBookModal").classList.add("open"); }
@@ -814,12 +904,13 @@ async function submitNewBook(e) {
     let coverBlob = preparedCoverBlob || rawFile;
 
     try {
-        const { data: inserted, error } = await getSb()
-            .from("books")
-            .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
-            .select().single();
-
-        if (error) throw error;
+        const { data: inserted } = await adminRun("admin.books.insert", () =>
+            getSb()
+                .from("books")
+                .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
+                .select()
+                .single()
+        );
 
         const newBook = inserted;
         if (coverBlob) newBook._coverUploading = true;
@@ -836,7 +927,11 @@ async function submitNewBook(e) {
             });
         }
     } catch (err) {
-        alert(currentLang === "ar" ? "فشل الإضافة" : "Failed to add book");
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message ||
+            (currentLang === "ar" ? "فشل الإضافة" : "Failed to add book");
+        console.error("[admin] submitNewBook:", err);
+        showAdminDashboardAlert(msg, "error");
+        alert(msg);
     } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML = originalBtn;
@@ -873,8 +968,12 @@ async function openOrderDetailsModal(orderId) {
     document.getElementById("detOrderStatusSelect").value = order.status;
     
     try {
-        const { data, error } = await getSb().from("order_items").select(`id, quantity, price, books (title, author)`).eq("order_id", orderId);
-        if (error) throw error;
+        const { data } = await adminRun("admin.order_items", () =>
+            getSb()
+                .from("order_items")
+                .select(`id, quantity, price, books (title, author)`)
+                .eq("order_id", orderId)
+        );
         
         let itemsSubtotal = 0;
         document.getElementById("detOrderItemsBody").innerHTML = (data || []).map(item => {
@@ -889,7 +988,10 @@ async function openOrderDetailsModal(orderId) {
         document.getElementById("detShippingPrice").innerText = `${shipping.toFixed(2)} ${t.currency}`;
         document.getElementById("detTotalPrice").innerText = `${(itemsSubtotal + shipping).toFixed(2)} ${t.currency}`;
     } catch (err) {
-        document.getElementById("detOrderItemsBody").innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger);">خطأ في التحميل.</td></tr>`;
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message ||
+            (currentLang === "ar" ? "خطأ في التحميل." : "Load failed.");
+        console.error("[admin] order details:", err);
+        document.getElementById("detOrderItemsBody").innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger);">${msg}</td></tr>`;
     }
 }
 
@@ -902,11 +1004,16 @@ async function updateOrderStatus() {
     if (!selectedOrderId) return;
     const newStatus = document.getElementById("detOrderStatusSelect").value;
     try {
-        await getSb().from("orders").update({ status: newStatus }).eq("id", selectedOrderId);
+        await adminRun("admin.orders.status", () =>
+            getSb().from("orders").update({ status: newStatus }).eq("id", selectedOrderId)
+        );
         const order = currentOrders.find(o => o.id === selectedOrderId);
         if (order) order.status = newStatus;
         filterOrders();
-    } catch (err) {}
+    } catch (err) {
+        console.error("[admin] updateOrderStatus:", err);
+        showAdminDashboardAlert(window.dmApiGuard?.normalizeError?.(err)?.message || "Error", "error");
+    }
 }
 
 async function deleteOrder() {
@@ -915,9 +1022,29 @@ async function deleteOrder() {
     if (!confirm(t.deleteConfirm)) return;
     
     try {
-        await getSb().from("orders").delete().eq("id", selectedOrderId);
+        await adminRun("admin.orders.delete", () =>
+            getSb().from("orders").delete().eq("id", selectedOrderId)
+        );
         currentOrders = currentOrders.filter(o => o.id !== selectedOrderId);
         filterOrders();
         closeOrderDetailsModal();
-    } catch (err) {}
+    } catch (err) {
+        console.error("[admin] deleteOrder:", err);
+        alert(window.dmApiGuard?.normalizeError?.(err)?.message || "Error");
+    }
 }
+
+// منع توقف السكربت بسبب Promise مرفوضة غير ملتقطة
+window.dmApiGuard?.installUnhandledRejectionGuard?.("admin", (err) => {
+    showAdminDashboardAlert(err.message, "error");
+    const ordersBody = document.getElementById("ordersTableBody");
+    const booksBody = document.getElementById("booksTableBody");
+    if (ordersBody?.querySelector("td")?.textContent?.includes("جاري") ||
+        ordersBody?.querySelector("td")?.textContent?.includes("Loading")) {
+        ordersBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger);">${err.message}</td></tr>`;
+    }
+    if (booksBody?.querySelector("td")?.textContent?.includes("جاري") ||
+        booksBody?.querySelector("td")?.textContent?.includes("Loading")) {
+        booksBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--danger);">${err.message}</td></tr>`;
+    }
+});

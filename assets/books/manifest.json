@@ -1,8 +1,6 @@
 {
   "covers": [
-    "assets/books/cover-1.jpg",
-    "assets/books/cover-2.jpg",
-    "assets/books/cover-3.jpg"
+    "assets/books/Cover-1.jpg.png"
   ],
-  "note": "ضع صور أغلفة بأسماء cover-1.jpg و cover-2.jpg و cover-3.jpg (أو عدّل المسارات هنا)"
+  "note": "أضف مسارات الملفات الموجودة فعلياً فقط — لا تُدرج cover-1.jpg إن الملف .png"
 }

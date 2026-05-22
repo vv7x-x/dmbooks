@@ -1,5 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Playfair+Display:wght@400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* تنبيه أعلى لوحة التحكم عند فشل تحميل البيانات */
+.admin-dashboard-alert {
+    margin: 0 0 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--r-md);
+    background: var(--danger);
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+}
+
+.admin-dashboard-alert--error {
+    background: rgba(155, 59, 59, 0.12);
+    color: var(--danger);
+    border: 1px solid rgba(155, 59, 59, 0.35);
+}
+
 :root{
 
     /* Brand — متوافق مع المتجر */

@@ -153,8 +153,30 @@ function hydrateBooksFromCache() {
     return true;
 }
 
+/** رسالة خطأ في شبكة الكتالوج */
+function showCatalogBanner(message, type) {
+    let el = document.getElementById("catalogStatusBanner");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "catalogStatusBanner";
+        el.setAttribute("role", "alert");
+        const catalog = document.getElementById("catalog");
+        const grid = document.getElementById("booksGrid");
+        if (catalog && grid) catalog.insertBefore(el, grid);
+    }
+    if (!message) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+    }
+    el.textContent = message;
+    el.className = "auth-message" + (type ? ` auth-message--${type}` : "");
+    el.hidden = false;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     applyLanguage(currentLang);
+    showCatalogBanner("");
 
     if (hydrateBooksFromCache()) {
         renderBooksGrid();
@@ -163,8 +185,18 @@ document.addEventListener("DOMContentLoaded", () => {
         showBooksSkeleton(SKELETON_COUNT);
     }
 
-    loadBooksFromDB();
-    window.dmHeroBooks?.initHeroBooks();
+    loadBooksFromDB().catch((err) => {
+        const msg = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err).message
+            : String(err?.message || err);
+        console.error("[index] loadBooks:", err);
+        showCatalogBanner(msg, "error");
+        showBooksLoadError(msg);
+    });
+
+    window.dmHeroBooks?.initHeroBooks()?.catch?.((err) => {
+        console.warn("[index] hero:", err);
+    });
 
     updateCartCount();
     updateWishlistCount();
@@ -173,6 +205,13 @@ document.addEventListener("DOMContentLoaded", () => {
         renderWishlist();
         initHeroParallax();
     });
+});
+
+window.dmApiGuard?.installUnhandledRejectionGuard?.("index", (err) => {
+    booksLoading = false;
+    const msg = err.message || "خطأ في التحميل";
+    showCatalogBanner(msg, "error");
+    if (!allBooks.length) showBooksLoadError(msg);
 });
 
 window.filterBooksDebounced = debounce(filterBooks, 280);
@@ -318,11 +357,14 @@ function showBooksLoadError(message) {
 async function loadBooksFromDB(forceRefresh = false) {
     const grid = document.getElementById("booksGrid");
     if (!grid || !window.dmBooks) {
-        showBooksLoadError("تعذر تهيئة التطبيق. حدّث الصفحة.");
+        const msg = "تعذر تهيئة التطبيق. حدّث الصفحة.";
+        showBooksLoadError(msg);
+        showCatalogBanner(msg, "error");
         return;
     }
 
     booksLoading = true;
+    showCatalogBanner("");
     if (!booksReady && !forceRefresh) showBooksSkeleton(SKELETON_COUNT);
 
     try {
@@ -332,14 +374,17 @@ async function loadBooksFromDB(forceRefresh = false) {
         renderBooksGrid();
         window.dmHeroBooks?.updateHeroFromBooks(allBooks);
     } catch (err) {
-        console.error("Error loading books:", err);
-        if (!allBooks.length) {
-            showBooksLoadError(
-                currentLang === "ar"
-                    ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
-                    : "Failed to load books. Check your connection and retry."
-            );
-        }
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[index] Error loading books:", normalized);
+        const msg =
+            normalized.message ||
+            (currentLang === "ar"
+                ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
+                : "Failed to load books. Check your connection and retry.");
+        showCatalogBanner(msg, "error");
+        if (!allBooks.length) showBooksLoadError(msg);
     } finally {
         booksLoading = false;
     }
@@ -408,7 +453,7 @@ function buildBookCardHtml(book, t) {
         if (eager) buildBookCardHtml.eagerCount++;
         else if (buildBookCardHtml.eagerCount === undefined) buildBookCardHtml.eagerCount = 0;
         const loadAttr = eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy" fetchpriority="low"';
-        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="280" height="400" decoding="async" ${loadAttr}>`;
+        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="280" height="400" decoding="async" ${loadAttr} onerror="this.classList.add('book-img-broken');this.style.visibility='hidden';this.parentElement?.classList.add('book-card-img--no-photo');">`;
     } else {
         coverImgHtml = `
             <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--forest-light) 0%, var(--forest) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #fff; text-align: center; border-left: 6px solid rgba(255,255,255,0.1);">

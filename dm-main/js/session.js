@@ -42,8 +42,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  updateHeader();
+  updateHeader().catch((err) => {
+    console.warn("[session] updateHeader:", err);
+  });
+
   if (supabase.auth && supabase.auth.onAuthStateChange) {
-    supabase.auth.onAuthStateChange(() => updateHeader());
+    supabase.auth.onAuthStateChange(() => {
+      updateHeader().catch((err) => {
+        console.warn("[session] onAuthStateChange:", err);
+      });
+    });
   }
 });

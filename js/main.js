@@ -354,15 +354,19 @@ function showBooksLoadError(message) {
 }
 
 // Fetch books — cache first, then network (stale-while-revalidate)
-async function loadBooksFromDB(forceRefresh = false) {
-    const grid = document.getElementById("booksGrid");
-    if (!grid || !window.dmBooks) {
-        const msg = "تعذر تهيئة التطبيق. حدّث الصفحة.";
-        showBooksLoadError(msg);
-        showCatalogBanner(msg, "error");
-        return;
+async function fetchData() {
+  try {
+    const response = await fetch('https://dmbooks-teal.vercel.app/api/endpoint'); // تأكد من الرابط الصحيح
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("مسكنا الغلط هنا يا فنان:", error);
+    // هنا تقدر تعرض رسالة لطيفة للمستخدم بدل ما الكود يقف تماماً
+  }
+}
     booksLoading = true;
     showCatalogBanner("");
     if (!booksReady && !forceRefresh) showBooksSkeleton(SKELETON_COUNT);

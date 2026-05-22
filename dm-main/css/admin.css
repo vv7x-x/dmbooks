@@ -261,6 +261,15 @@ ADMIN LOGIN
     border-radius:var(--r-md);
 }
 
+#adminEmail{
+    color:#000;
+    background:rgba(255,255,255,.92);
+}
+
+#adminEmail::placeholder{
+    color:rgba(0,0,0,.45);
+}
+
 .admin-login-card input:focus{
     outline:none;
     border-color:var(--gold);

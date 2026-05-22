@@ -10,7 +10,7 @@ const translations = {
         lblAdminPassword: "كلمة المرور *",
         btnLoginSubmit: "<i class='fa-solid fa-right-to-bracket'></i> تسجيل الدخول",
         sidebarTitle: "لوحة التحكم dm",
-        btnTabOrdersText: "الالطلبات الواردة",
+        btnTabOrdersText: "الطلبات الواردة",
         btnTabBooksText: "إدارة الكتب",
         btnAdminLogoutText: "تسجيل الخروج",
         ordersPaneTitle: "الطلبات الواردة",
@@ -233,7 +233,8 @@ function toggleLanguage() {
     applyLanguage(currentLang);
     
     // Refresh elements
-    if (document.getElementById("adminDashboardState").style.display !== "none") {
+    const dash = document.getElementById("adminDashboardState");
+    if (dash && dash.style.display !== "none") {
         if (activeTab === "orders") {
             renderOrdersTable();
         } else {
@@ -362,8 +363,9 @@ function applyLanguage(lang) {
 }
 
 async function checkAuthSession() {
+    let sb;
     try {
-        const sb = getSb();
+        sb = getSb();
         const { data: { session }, error } = await sb.auth.getSession();
         if (error) throw error;
         await handleAdminSession(session);
@@ -376,9 +378,10 @@ async function checkAuthSession() {
             "error"
         );
         toggleUIState(false);
+        return;
     }
 
-    getSb().auth.onAuthStateChange(async (_event, session) => {
+    sb.auth.onAuthStateChange(async (_event, session) => {
         await handleAdminSession(session);
     });
 }
@@ -411,6 +414,10 @@ async function checkIfAdmin(uid) {
     if (!uid) return false;
     try {
         const sb = getSb();
+
+        const { data: rpcOk, error: rpcErr } = await sb.rpc("check_is_admin");
+        if (!rpcErr && rpcOk === true) return true;
+
         const { data: adminRow, error: e1 } = await sb
             .from("admin_users")
             .select("user_id")
@@ -466,12 +473,10 @@ async function loginAdmin(e) {
             await sb.auth.signOut();
             showAdminLoginMessage(
                 currentLang === "ar"
-                    ? "تم الدخول لكن الحساب ليس مشرفاً. نفّذ: INSERT INTO admin_users (user_id) VALUES (\'YOUR-UUID\');"
+                    ? "تم الدخول لكن الحساب ليس مشرفاً. شغّل في SQL Editor: INSERT INTO admin_users (user_id) SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';"
                     : "Signed in but not an admin. Add your UUID to admin_users.",
                 "error"
             );
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = originalBtn;
             return;
         }
         await handleAdminSession(data.session);
@@ -484,6 +489,7 @@ async function loginAdmin(e) {
                     : "Invalid email or password."
                 : err.message || (currentLang === "ar" ? "فشل تسجيل الدخول." : "Login failed.");
         showAdminLoginMessage(msg, "error");
+    } finally {
         loginBtn.disabled = false;
         loginBtn.innerHTML = originalBtn;
     }
@@ -548,7 +554,7 @@ function renderOrdersTable() {
     const t = translations[currentLang];
     
     if (currentOrders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-light); padding:20px;">لا يوجد طلبات حالياً.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-muted, #7A6E66); padding:20px;">لا يوجد طلبات حالياً.</td></tr>`;
         return;
     }
     
@@ -577,8 +583,8 @@ function renderOrdersTable() {
             <td style="font-weight:700;">${order.customer_name}</td>
             <td><a href="tel:${order.customer_phone}">${order.customer_phone}</a></td>
             <td>${order.governorate}</td>
-            <td style="font-size:13px; color:var(--text-light);">${orderDate}</td>
-            <td style="font-weight:800; color:var(--primary-medium);">${totalCost.toFixed(2)} ${t.currency}</td>
+            <td style="font-size:13px; color:var(--ink-muted, #7A6E66);">${orderDate}</td>
+            <td style="font-weight:800; color:var(--gold);">${totalCost.toFixed(2)} ${t.currency}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
                 <button class="btn btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="openOrderDetailsModal('${order.id}')">
@@ -791,10 +797,11 @@ async function submitNewBook(e) {
         if (insertError) throw insertError;
         
         closeAddBookModal();
-        loadBooks(); // reload table
+        loadBooks();
     } catch (err) {
         console.error("Error creating book:", err);
         alert(currentLang === "ar" ? "فشل إضافة الكتاب. يرجى التحقق من الاتصال." : "Failed to add book. Please check connection.");
+    } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML = originalBtn;
     }

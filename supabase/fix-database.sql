@@ -86,6 +86,37 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.check_is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.is_admin();
+$$;
+
+CREATE OR REPLACE FUNCTION public.sync_profile_admin_flag()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.profiles SET is_admin = true, updated_at = now() WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_admin_user_added ON public.admin_users;
+CREATE TRIGGER on_admin_user_added
+  AFTER INSERT ON public.admin_users
+  FOR EACH ROW EXECUTE FUNCTION public.sync_profile_admin_flag();
+
+UPDATE public.profiles p
+SET is_admin = true, updated_at = now()
+WHERE EXISTS (SELECT 1 FROM public.admin_users a WHERE a.user_id = p.id);
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -257,10 +288,13 @@ GRANT SELECT ON public.books TO anon, authenticated;
 GRANT INSERT, SELECT, UPDATE ON public.orders TO anon, authenticated;
 GRANT INSERT, SELECT ON public.order_items TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
+GRANT SELECT ON public.admin_users TO authenticated;
 GRANT INSERT ON public.contact_messages TO anon, authenticated;
 GRANT ALL ON public.books TO authenticated;
 GRANT ALL ON public.orders TO authenticated;
 GRANT ALL ON public.order_items TO authenticated;
+GRANT EXECUTE ON FUNCTION public.check_is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
 
 -- ═══ بعد التشغيل ═══
 -- 1) أنشئ مستخدم أدمن من Authentication > Users

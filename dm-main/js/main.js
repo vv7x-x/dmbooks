@@ -275,7 +275,9 @@ function renderBooksGrid() {
     
     // Filter
     let filtered = allBooks.filter(book => {
-        const matchesSearch = book.title.toLowerCase().includes(searchVal) || book.author.toLowerCase().includes(searchVal);
+        const title = (book.title || "").toLowerCase();
+        const author = (book.author || "").toLowerCase();
+        const matchesSearch = title.includes(searchVal) || author.includes(searchVal);
         const matchesCategory = catVal === "all" || book.category === catVal;
         const matchesLanguage = langVal === "all" || book.language === langVal;
         return matchesSearch && matchesCategory && matchesLanguage;

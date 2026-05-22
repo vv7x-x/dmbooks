@@ -41,6 +41,7 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.check_is_admin() TO authenticated;
+GRANT SELECT ON public.admin_users TO authenticated;
 
 -- 4) Storage — bucket أغلفة الكتب
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

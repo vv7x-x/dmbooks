@@ -804,6 +804,10 @@ async function deleteBook(bookId) {
     
     try {
         await adminRun("admin.books.delete", () => getSb().from("books").delete().eq("id", bookId));
+        
+        // تصفير الكاش لإجبار الموقع على إعادة جلب البيانات المحدثة
+        localStorage.setItem("dm_books_cache_time", "0");
+        
         currentBooks = currentBooks.filter(b => b.id !== bookId);
         filterBooks();
     } catch (err) {

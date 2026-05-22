@@ -110,8 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     updateCartCount();
     updateWishlistCount();
-    renderCart();
-    renderWishlist();
+    requestAnimationFrame(() => {
+        renderCart();
+        renderWishlist();
+    });
 });
 
 // Switch Language
@@ -177,27 +179,42 @@ function applyLanguage(lang) {
     safeSetText("footerCOD", t.footerCOD);
 }
 
-// Load Book Details from Supabase
+// Load book — show cache instantly, then full record (incl. description)
 async function loadBookDetails() {
     try {
-        const supabase = window.getSupabaseClient();
-        const { data, error } = await supabase
-            .from("books")
-            .select("*")
-            .eq("id", bookId)
-            .single();
-            
-        if (error) throw error;
+        if (window.dmBooks) {
+            const cached = window.dmBooks.readCache();
+            const hit = cached && cached.find((b) => b.id === bookId);
+            if (hit) {
+                currentBook = hit;
+                renderBookDetails(hit);
+            }
+        }
+
+        const fetcher = window.dmBooks
+            ? () => window.dmBooks.fetchBookById(bookId)
+            : async () => {
+                const supabase = window.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from("books")
+                    .select("*")
+                    .eq("id", bookId)
+                    .single();
+                if (error) throw error;
+                return data;
+            };
+
+        const data = await fetcher();
         if (!data) {
             showErrorMsg();
             return;
         }
-        
+
         currentBook = data;
         renderBookDetails(data);
     } catch (err) {
         console.error("Error fetching book details:", err);
-        showErrorMsg();
+        if (!currentBook) showErrorMsg();
     }
 }
 
@@ -223,7 +240,10 @@ function renderBookDetails(book) {
     // Cover Image
     let coverHtml = "";
     if (book.image_url) {
-        coverHtml = `<img src="${book.image_url}" alt="${book.title}">`;
+        const src = window.dmBooks
+            ? window.dmBooks.bookCoverUrl(book.image_url, 560)
+            : book.image_url;
+        coverHtml = `<img src="${src}" alt="${book.title}" width="280" height="400" loading="eager" decoding="async">`;
     } else {
         // Fallback Premium Cover
         coverHtml = `

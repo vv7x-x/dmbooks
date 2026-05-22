@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://vjibucksajumamngxcku.supabase.co" crossorigin>
+    <link rel="dns-prefetch" href="https://vjibucksajumamngxcku.supabase.co">
     <title>dm | متجر الكتب الأول</title>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -118,7 +120,7 @@
             <!-- Search -->
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" placeholder="ابحث باسم الكتاب أو الكاتب..." oninput="filterBooks()">
+                <input type="text" id="searchInput" placeholder="ابحث باسم الكتاب أو الكاتب..." oninput="filterBooksDebounced()">
             </div>
             
             <!-- Category Filter -->
@@ -148,12 +150,8 @@
         </div>
 
         <!-- Books Grid -->
-        <div class="books-grid" id="booksGrid">
-            <!-- Dynamic Books Loaded Here -->
-            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--ink-muted);" id="loadingText">
-                <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--gold);"></i>
-                <p style="margin-top: 10px;">جاري تحميل الكتب...</p>
-            </div>
+        <div class="books-grid is-loading" id="booksGrid" aria-busy="true">
+            <!-- Skeleton placeholders until books load -->
         </div>
     </main>
 
@@ -253,6 +251,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Supabase Config -->
     <script src="js/supabase-config.js"></script>
+    <script src="js/books-store.js"></script>
     <script src="js/session.js"></script>
     <!-- App Logic -->
     <script src="js/main.js"></script>

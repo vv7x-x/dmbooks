@@ -149,11 +149,12 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
               </div>
             </div>
             <div class="form-group"><label id="lblBookDescInput">الوصف</label><textarea id="bookDescInput" rows="3"></textarea></div>
-            <div class="form-group"><label id="lblBookCoverUpload">صورة الغلاف</label>
+            <div class="form-group"><label id="lblBookCoverUpload">صورة الغلاف (اختياري — تُرفع بالخلفية)</label>
               <div class="image-upload-wrapper" onclick="triggerFileInput()">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
-                <p id="uploadPromptText">اضغط لاختيار صورة</p>
-                <input type="file" id="bookCoverFile" accept="image/*" style="display:none;" onchange="previewImage(event)">
+                <p id="uploadPromptText">اضغط لاختيار صورة — تُضغط تلقائياً للرفع السريع</p>
+                <p id="coverCompressHint" class="cover-compress-hint" hidden></p>
+                <input type="file" id="bookCoverFile" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="previewImage(event)">
                 <img id="bookCoverPreview" class="image-preview" src="#" alt="" style="display:none;">
               </div>
             </div>
@@ -228,6 +229,8 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/books-store.js"></script>
+  <script src="js/image-utils.js"></script>
   <script src="js/admin.js"></script>
 </body>
 </html>

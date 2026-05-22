@@ -112,18 +112,51 @@ const translations = {
 
 let currentLang = localStorage.getItem("lang") || "ar";
 let allBooks = [];
+let booksLoading = false;
+let booksReady = false;
+let renderGridToken = 0;
 let cart = JSON.parse(localStorage.getItem("cart")) || [];
 let wishlist = JSON.parse(localStorage.getItem("wishlist")) || [];
 
+const BOOK_RENDER_BATCH = 12;
+const CATEGORY_LABEL_KEYS = {
+    novels: "catNovels",
+    religious: "catReligious",
+    "self-development": "catSelf",
+    children: "catChildren",
+    science: "catScience",
+    history: "catHistory",
+};
+
+function escapeHtml(str) {
+    return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/"/g, "&quot;");
+}
+
+function debounce(fn, ms) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     applyLanguage(currentLang);
+    showBooksSkeleton();
     loadBooksFromDB();
     updateCartCount();
     updateWishlistCount();
-    renderCart();
-    renderWishlist();
-    initHeroParallax();
+    requestAnimationFrame(() => {
+        renderCart();
+        renderWishlist();
+        initHeroParallax();
+    });
 });
+
+window.filterBooksDebounced = debounce(filterBooks, 280);
 
 // Switch Language
 function toggleLanguage() {
@@ -225,30 +258,82 @@ function applyLanguage(lang) {
     safeSetText("footerCOD", t.footerCOD);
 }
 
-// Fetch Books from Database
-async function loadBooksFromDB() {
+function showBooksSkeleton(count = 8) {
+    const grid = document.getElementById("booksGrid");
+    if (!grid) return;
+    booksLoading = true;
+    grid.classList.add("is-loading");
+    grid.setAttribute("aria-busy", "true");
+    const t = translations[currentLang];
+    grid.innerHTML = Array.from({ length: count }, () => `
+        <div class="book-card-skeleton" aria-hidden="true">
+            <div class="book-card-skeleton-cover"></div>
+            <div class="book-card-skeleton-body">
+                <div class="book-card-skeleton-line medium"></div>
+                <div class="book-card-skeleton-line"></div>
+                <div class="book-card-skeleton-line short"></div>
+            </div>
+        </div>
+    `).join("") + `<p class="books-loading-hint" style="grid-column:1/-1;text-align:center;color:var(--ink-muted);margin-top:8px;">
+        <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold)"></i> ${t.loadingText}
+    </p>`;
+}
+
+function showBooksLoadError(message) {
+    const grid = document.getElementById("booksGrid");
+    if (!grid) return;
+    booksLoading = false;
+    booksReady = false;
+    grid.classList.remove("is-loading");
+    grid.removeAttribute("aria-busy");
+    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--danger); padding: 30px;">
+        <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
+        <p style="margin-top: 10px;">${escapeHtml(message)}</p>
+        <button type="button" class="btn btn-outline" style="margin-top:16px" onclick="loadBooksFromDB(true)">
+            <i class="fa-solid fa-rotate"></i> إعادة المحاولة
+        </button>
+    </div>`;
+}
+
+// Fetch books — cache first, then network (stale-while-revalidate)
+async function loadBooksFromDB(forceRefresh = false) {
+    const grid = document.getElementById("booksGrid");
+    if (!grid || !window.dmBooks) {
+        showBooksLoadError("تعذر تهيئة التطبيق. حدّث الصفحة.");
+        return;
+    }
+
+    if (!booksReady) showBooksSkeleton();
+
     try {
-        const supabase = window.getSupabaseClient();
-        const { data, error } = await supabase
-            .from("books")
-            .select("*")
-            .order("created_at", { ascending: false });
-            
-        if (error) throw error;
-        
-        allBooks = data || [];
+        if (!forceRefresh) {
+            const cached = window.dmBooks.readCache();
+            if (cached && cached.length) {
+                allBooks = cached;
+                booksReady = true;
+                renderBooksGrid();
+            }
+        }
+
+        const { data } = await window.dmBooks.fetchBooksList({ force: forceRefresh });
+        allBooks = data;
+        booksReady = true;
         renderBooksGrid();
     } catch (err) {
         console.error("Error loading books:", err);
-        const grid = document.getElementById("booksGrid");
-        if (grid) {
-            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--danger); padding: 30px;">
-                <i class="fa-solid fa-triangle-exclamation fa-2x"></i>
-                <p style="margin-top: 10px;">حدث خطأ أثناء تحميل الكتب. الرجاء المحاولة لاحقاً.</p>
-            </div>`;
+        if (!allBooks.length) {
+            showBooksLoadError(
+                currentLang === "ar"
+                    ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
+                    : "Failed to load books. Check your connection and retry."
+            );
         }
+    } finally {
+        booksLoading = false;
     }
 }
+
+window.loadBooksFromDB = loadBooksFromDB;
 
 // Filter and Sort Books
 function filterBooks() {
@@ -263,99 +348,148 @@ function selectCategory(cat) {
     }
 }
 
-function renderBooksGrid() {
-    const grid = document.getElementById("booksGrid");
-    if (!grid) return;
-    
-    const searchVal = document.getElementById("searchInput").value.toLowerCase();
-    const catVal = document.getElementById("categoryFilter").value;
-    const langVal = document.getElementById("languageFilter").value;
-    const sortVal = document.getElementById("sortBy").value;
-    const t = translations[currentLang];
-    
-    // Filter
-    let filtered = allBooks.filter(book => {
+function getFilteredBooks() {
+    const searchEl = document.getElementById("searchInput");
+    const catEl = document.getElementById("categoryFilter");
+    const langEl = document.getElementById("languageFilter");
+    const sortEl = document.getElementById("sortBy");
+
+    const searchVal = (searchEl?.value || "").toLowerCase().trim();
+    const catVal = catEl?.value || "all";
+    const langVal = langEl?.value || "all";
+    const sortVal = sortEl?.value || "latest";
+
+    let filtered = allBooks.filter((book) => {
         const title = (book.title || "").toLowerCase();
         const author = (book.author || "").toLowerCase();
-        const matchesSearch = title.includes(searchVal) || author.includes(searchVal);
+        const matchesSearch = !searchVal || title.includes(searchVal) || author.includes(searchVal);
         const matchesCategory = catVal === "all" || book.category === catVal;
         const matchesLanguage = langVal === "all" || book.language === langVal;
         return matchesSearch && matchesCategory && matchesLanguage;
     });
-    
-    // Sort
+
     if (sortVal === "price-low") {
-        filtered.sort((a, b) => a.price - b.price);
+        filtered.sort((a, b) => Number(a.price) - Number(b.price));
     } else if (sortVal === "price-high") {
-        filtered.sort((a, b) => b.price - a.price);
+        filtered.sort((a, b) => Number(b.price) - Number(a.price));
     } else {
-        // default latest
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
-    
-    if (filtered.length === 0) {
+
+    return filtered;
+}
+
+function buildBookCardHtml(book, t) {
+    const inWishlist = wishlist.some((item) => item.id === book.id);
+    const isAr = book.language === "ar";
+    const isOutOfStock = book.in_stock === false;
+    const bookId = escapeHtml(book.id);
+    const title = escapeHtml(book.title);
+    const author = escapeHtml(book.author);
+
+    let coverImgHtml = "";
+    if (book.image_url) {
+        const src = window.dmBooks
+            ? window.dmBooks.bookCoverUrl(book.image_url, 420)
+            : book.image_url;
+        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="280" height="400" loading="lazy" decoding="async" fetchpriority="low">`;
+    } else {
+        coverImgHtml = `
+            <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--forest-light) 0%, var(--forest) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #fff; text-align: center; border-left: 6px solid rgba(255,255,255,0.1);">
+                <div style="width: 30px; height: 2px; background: var(--gold); margin-bottom: 12px;"></div>
+                <div style="font-size: 15px; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.7);">${author}</div>
+            </div>`;
+    }
+
+    const catKey = CATEGORY_LABEL_KEYS[book.category];
+    const categoryLabel = catKey ? t[catKey] : escapeHtml(book.category);
+
+    return `
+        <div class="book-card">
+            <button class="wishlist-btn ${inWishlist ? "active" : ""}" onclick="toggleWishlistItem('${bookId}')" title="${escapeHtml(t.wishlistDrawerTitle)}">
+                <i class="${inWishlist ? "fa-solid" : "fa-regular"} fa-heart"></i>
+            </button>
+            <span class="book-badge ${isOutOfStock ? "badge-out-of-stock" : isAr ? "badge-ar" : "badge-en"}">
+                ${isOutOfStock ? t.outOfStock : isAr ? t.arLangName : t.enLangName}
+            </span>
+            <a href="book-details.html?id=${bookId}" class="book-card-img">${coverImgHtml}</a>
+            <div class="book-card-info">
+                <span class="book-card-category">${categoryLabel}</span>
+                <a href="book-details.html?id=${bookId}"><h3 class="book-card-title">${title}</h3></a>
+                <p class="book-card-author">${t.authorLabel}${author}</p>
+                <div class="book-card-footer">
+                    <div class="book-card-price">${book.price} <span>${t.currency}</span></div>
+                    ${isOutOfStock ? "" : `<button class="add-cart-btn" onclick="addToCart('${bookId}')" title="${escapeHtml(t.addToCart)}"><i class="fa-solid fa-cart-plus"></i></button>`}
+                </div>
+            </div>
+        </div>`;
+}
+
+function renderBooksGridChunked(grid, books, t, token) {
+    grid.innerHTML = "";
+    let index = 0;
+
+    function appendBatch() {
+        if (token !== renderGridToken) return;
+        const slice = books.slice(index, index + BOOK_RENDER_BATCH);
+        if (!slice.length) {
+            grid.classList.add("books-grid-fade-in");
+            return;
+        }
+        const html = slice.map((book) => buildBookCardHtml(book, t)).join("");
+        grid.insertAdjacentHTML("beforeend", html);
+        index += BOOK_RENDER_BATCH;
+        if (index < books.length) {
+            requestAnimationFrame(appendBatch);
+        } else {
+            grid.classList.add("books-grid-fade-in");
+        }
+    }
+
+    requestAnimationFrame(appendBatch);
+}
+
+function renderBooksGrid() {
+    const grid = document.getElementById("booksGrid");
+    if (!grid) return;
+
+    if (booksLoading && !booksReady) return;
+
+    const t = translations[currentLang];
+    const token = ++renderGridToken;
+
+    if (!allBooks.length) {
+        if (!booksReady) return;
+        grid.classList.remove("is-loading");
+        grid.removeAttribute("aria-busy");
         grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">
             <i class="fa-regular fa-folder-open fa-3x" style="margin-bottom:12px;"></i>
             <p>${t.noBooksText}</p>
         </div>`;
         return;
     }
-    
-    grid.innerHTML = filtered.map(book => {
-        const inWishlist = wishlist.some(item => item.id === book.id);
-        const isAr = book.language === "ar";
-        const isOutOfStock = book.in_stock === false;
-        
-        // Handle images
-        let coverImgHtml = "";
-        if (book.image_url) {
-            coverImgHtml = `<img src="${book.image_url}" alt="${book.title}" loading="lazy">`;
-        } else {
-            // Premium CSS Cover Graphic
-            coverImgHtml = `
-            <div style="width: 100%; height: 100%; background: linear-gradient(135deg, var(--forest-light) 0%, var(--forest) 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: #fff; text-align: center; border-left: 6px solid rgba(255,255,255,0.1);">
-                <div style="width: 30px; height: 2px; background: var(--gold); margin-bottom: 12px;"></div>
-                <div style="font-size: 15px; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; margin-bottom: 8px;">${book.title}</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.7);">${book.author}</div>
-            </div>`;
-        }
-        
-        const categoryLabel = t["cat" + book.category.charAt(0).toUpperCase() + book.category.slice(1).replace("-", "")] || book.category;
-        
-        return `
-        <div class="book-card">
-            <!-- Wishlist Icon -->
-            <button class="wishlist-btn ${inWishlist ? 'active' : ''}" onclick="toggleWishlistItem('${book.id}')" title="${t.wishlistDrawerTitle}">
-                <i class="${inWishlist ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
-            </button>
-            
-            <!-- Language Badge -->
-            <span class="book-badge ${isOutOfStock ? 'badge-out-of-stock' : (isAr ? 'badge-ar' : 'badge-en')}">
-                ${isOutOfStock ? t.outOfStock : (isAr ? t.arLangName : t.enLangName)}
-            </span>
-            
-            <a href="book-details.html?id=${book.id}" class="book-card-img">
-                ${coverImgHtml}
-            </a>
-            
-            <div class="book-card-info">
-                <span class="book-card-category">${categoryLabel}</span>
-                <a href="book-details.html?id=${book.id}">
-                    <h3 class="book-card-title">${book.title}</h3>
-                </a>
-                <p class="book-card-author">${t.authorLabel}${book.author}</p>
-                
-                <div class="book-card-footer">
-                    <div class="book-card-price">${book.price} <span>${t.currency}</span></div>
-                    ${isOutOfStock ? '' : `
-                    <button class="add-cart-btn" onclick="addToCart('${book.id}')" title="${t.addToCart}">
-                        <i class="fa-solid fa-cart-plus"></i>
-                    </button>
-                    `}
-                </div>
-            </div>
+
+    const filtered = getFilteredBooks();
+
+    grid.classList.remove("is-loading", "books-grid-fade-in");
+    grid.removeAttribute("aria-busy");
+
+    if (!filtered.length) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-light);">
+            <i class="fa-regular fa-folder-open fa-3x" style="margin-bottom:12px;"></i>
+            <p>${t.noBooksText}</p>
         </div>`;
-    }).join("");
+        return;
+    }
+
+    if (filtered.length > BOOK_RENDER_BATCH * 2) {
+        renderBooksGridChunked(grid, filtered, t, token);
+        return;
+    }
+
+    grid.innerHTML = filtered.map((book) => buildBookCardHtml(book, t)).join("");
+    grid.classList.add("books-grid-fade-in");
 }
 
 // Drawer controls
@@ -517,7 +651,10 @@ function renderWishlist() {
     container.innerHTML = wishlist.map(item => {
         let coverImgHtml = "";
         if (item.image_url) {
-            coverImgHtml = `<img src="${item.image_url}" alt="${item.title}">`;
+            const src = window.dmBooks
+                ? window.dmBooks.bookCoverUrl(item.image_url, 120)
+                : item.image_url;
+            coverImgHtml = `<img src="${src}" alt="${item.title}" width="80" height="100" loading="lazy" decoding="async">`;
         } else {
             coverImgHtml = `<div style="width:100%; height:100%; background:var(--forest); display:flex; align-items:center; justify-content:center; color:var(--gold); font-size:16px; font-weight:700;"><i class="fa-solid fa-book-open"></i></div>`;
         }

@@ -68,6 +68,8 @@ const translations = {
         saving: "جاري الحفظ...",
         deleteConfirm: "هل أنت متأكد من حذف هذا الطلب نهائياً؟",
         bookDeleteConfirm: "هل أنت متأكد من حذف هذا الكتاب نهائياً؟",
+        noSearchResults: "لا توجد نتائج مطابقة للبحث.",
+        noOrdersToExport: "لا توجد طلبات لتصديرها.",
         
         statusPending: "قيد الانتظار",
         statusProcessing: "جاري التجهيز",
@@ -165,6 +167,8 @@ const translations = {
         saving: "Saving...",
         deleteConfirm: "Are you sure you want to permanently delete this order?",
         bookDeleteConfirm: "Are you sure you want to permanently delete this book?",
+        noSearchResults: "No results match your search.",
+        noOrdersToExport: "No orders available to export.",
         
         statusPending: "Pending",
         statusProcessing: "Processing",
@@ -201,7 +205,6 @@ let activeTab = "orders";
 let currentOrders = [];
 let currentBooks = [];
 let selectedOrderId = null;
-/** غلاف مضغوط جاهز للرفع (يُحضَّر عند اختيار الصورة) */
 let preparedCoverBlob = null;
 let preparedCoverPreviewUrl = null;
 
@@ -235,13 +238,12 @@ function toggleLanguage() {
     localStorage.setItem("lang", currentLang);
     applyLanguage(currentLang);
     
-    // Refresh elements
     const dash = document.getElementById("adminDashboardState");
     if (dash && dash.style.display !== "none") {
         if (activeTab === "orders") {
-            renderOrdersTable();
+            filterOrders(); // Re-render with active filters
         } else {
-            renderBooksTable();
+            filterBooks(); // Re-render with active filters
         }
     }
 }
@@ -271,19 +273,16 @@ function applyLanguage(lang) {
     safeSetText("navCatalog", t.navCatalog);
     safeSetText("navAdmin", t.navAdmin);
     
-    // Login Panel
     safeSetText("loginTitle", t.loginTitle);
     safeSetText("lblAdminEmail", t.lblAdminEmail);
     safeSetText("lblAdminPassword", t.lblAdminPassword);
     safeSetText("btnLoginSubmit", t.btnLoginSubmit);
     
-    // Sidebar
     safeSetText("sidebarTitle", t.sidebarTitle);
     safeSetText("btnTabOrdersText", t.btnTabOrdersText);
     safeSetText("btnTabBooksText", t.btnTabBooksText);
     safeSetText("btnAdminLogoutText", t.btnAdminLogoutText);
     
-    // Orders list headers
     safeSetText("ordersPaneTitle", t.ordersPaneTitle);
     safeSetText("thCustomerName", t.thCustomerName);
     safeSetText("thPhone", t.thPhone);
@@ -293,7 +292,6 @@ function applyLanguage(lang) {
     safeSetText("thStatus", t.thStatus);
     safeSetText("thActions", t.thActions);
     
-    // Books list headers
     safeSetText("booksPaneTitle", t.booksPaneTitle);
     safeSetText("btnAddBookBtn", t.btnAddBookBtn);
     safeSetText("btnAddBookBtn2", t.btnAddBookBtn);
@@ -306,7 +304,6 @@ function applyLanguage(lang) {
     safeSetText("thBookStock", t.thBookStock);
     safeSetText("thBookActions", t.thBookActions);
     
-    // Modals
     safeSetText("addBookModalTitle", t.addBookModalTitle);
     safeSetText("lblBookTitleInput", t.lblBookTitleInput);
     safeSetText("lblBookAuthorInput", t.lblBookAuthorInput);
@@ -319,7 +316,6 @@ function applyLanguage(lang) {
     safeSetText("btnCancelBook", t.btnCancelBook);
     safeSetText("btnSubmitBook", t.btnSubmitBook);
     
-    // Detail Modal
     safeSetText("orderDetailsModalTitle", t.orderDetailsModalTitle);
     safeSetText("orderCustInfoTitle", t.orderCustInfoTitle);
     safeSetText("lblDetName", t.lblDetName);
@@ -341,19 +337,6 @@ function applyLanguage(lang) {
     safeSetText("btnDeleteOrder", t.btnDeleteOrder);
     safeSetText("btnSaveOrderDet", t.btnSaveOrderDet);
     
-    // Footer
-    safeSetText("footerAbout", t.footerAbout);
-    safeSetText("footerQuickLinks", t.footerQuickLinks);
-    safeSetText("footerLinkHome", t.footerLinkHome);
-    safeSetText("footerLinkCatalog", t.footerLinkCatalog);
-    safeSetText("footerLinkAdmin", t.footerLinkAdmin);
-    safeSetText("footerCategoriesTitle", t.footerCategoriesTitle);
-    safeSetText("footerContactTitle", t.footerContactTitle);
-    safeSetText("footerLocation", t.footerLocation);
-    safeSetText("footerCopyright", t.footerCopyright);
-    safeSetText("footerCOD", t.footerCOD);
-    
-    // Book category dropdown choices translation
     const catSelect = document.getElementById("bookCategoryInput");
     if (catSelect) {
         catSelect.options[0].text = t.catNovels;
@@ -373,10 +356,9 @@ async function checkAuthSession() {
         if (error) throw error;
         await handleAdminSession(session);
     } catch (err) {
-        console.error("Session check failure:", err);
         showAdminLoginMessage(
             currentLang === "ar"
-                ? "تعذر الاتصال بقاعدة البيانات. تأكد من تشغيل سكربت SQL."
+                ? "تعذر الاتصال بقاعدة البيانات. تأكد من إعداد Supabase."
                 : "Database connection failed.",
             "error"
         );
@@ -398,14 +380,10 @@ async function handleAdminSession(session) {
     if (!isAdmin) {
         const msg =
             currentLang === "ar"
-                ? "هذا الحساب غير مخوّل. أضف user_id في جدول admin_users عبر Supabase SQL."
-                : "Unauthorized. Add your user_id to admin_users table in Supabase.";
+                ? "هذا الحساب غير مخوّل."
+                : "Unauthorized access.";
         showAdminLoginMessage(msg, "error");
-        try {
-            await getSb().auth.signOut();
-        } catch (e) {
-            /* ignore */
-        }
+        try { await getSb().auth.signOut(); } catch (e) {}
         toggleUIState(false);
         return;
     }
@@ -417,27 +395,17 @@ async function checkIfAdmin(uid) {
     if (!uid) return false;
     try {
         const sb = getSb();
-
         const { data: rpcOk, error: rpcErr } = await sb.rpc("check_is_admin");
         if (!rpcErr && rpcOk === true) return true;
 
-        const { data: adminRow, error: e1 } = await sb
-            .from("admin_users")
-            .select("user_id")
-            .eq("user_id", uid)
-            .maybeSingle();
+        const { data: adminRow, error: e1 } = await sb.from("admin_users").select("user_id").eq("user_id", uid).maybeSingle();
         if (!e1 && adminRow) return true;
 
-        const { data: profile, error: e2 } = await sb
-            .from("profiles")
-            .select("is_admin")
-            .eq("id", uid)
-            .maybeSingle();
+        const { data: profile, error: e2 } = await sb.from("profiles").select("is_admin").eq("id", uid).maybeSingle();
         if (!e2 && profile?.is_admin) return true;
 
         return false;
     } catch (err) {
-        console.error("Admin check failure:", err);
         return false;
     }
 }
@@ -453,7 +421,6 @@ function toggleUIState(isLoggedIn) {
     }
 }
 
-// Login
 async function loginAdmin(e) {
     e.preventDefault();
     const email = document.getElementById("adminEmail").value.trim();
@@ -476,21 +443,17 @@ async function loginAdmin(e) {
             await sb.auth.signOut();
             showAdminLoginMessage(
                 currentLang === "ar"
-                    ? "تم الدخول لكن الحساب ليس مشرفاً. شغّل في SQL Editor: INSERT INTO admin_users (user_id) SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';"
-                    : "Signed in but not an admin. Add your UUID to admin_users.",
+                    ? "الحساب ليس مشرفاً."
+                    : "Not an admin account.",
                 "error"
             );
             return;
         }
         await handleAdminSession(data.session);
     } catch (err) {
-        console.error("Login failed:", err);
-        const msg =
-            err.message?.includes("Invalid login")
-                ? currentLang === "ar"
-                    ? "البريد أو كلمة المرور غير صحيحة."
-                    : "Invalid email or password."
-                : err.message || (currentLang === "ar" ? "فشل تسجيل الدخول." : "Login failed.");
+        const msg = err.message?.includes("Invalid login")
+                ? (currentLang === "ar" ? "البريد أو كلمة المرور غير صحيحة." : "Invalid email or password.")
+                : (currentLang === "ar" ? "فشل تسجيل الدخول." : "Login failed.");
         showAdminLoginMessage(msg, "error");
     } finally {
         loginBtn.disabled = false;
@@ -498,38 +461,27 @@ async function loginAdmin(e) {
     }
 }
 
-// Logout
 async function logoutAdmin() {
-    try {
-        await getSb().auth.signOut();
-    } catch (err) {
-        console.error("Logout failed:", err);
-    }
+    try { await getSb().auth.signOut(); } catch (err) {}
 }
 
-// Tab Swapping
 function switchTab(tab) {
     activeTab = tab;
-    
-    // Toggle sidebar active items
     document.getElementById("tabBtnOrders").classList.toggle("active", tab === "orders");
     document.getElementById("tabBtnBooks").classList.toggle("active", tab === "books");
-    
-    // Toggle display panes
     document.getElementById("paneOrders").style.display = tab === "orders" ? "block" : "none";
     document.getElementById("paneBooks").style.display = tab === "books" ? "block" : "none";
     
-    if (tab === "orders") {
-        loadOrders();
-    } else {
-        loadBooks();
-    }
+    if (tab === "orders") loadOrders();
+    else loadBooks();
 }
 
-// Load Orders
+// ---------------------------
+// قسم الطلبات والفلترة والتصدير
+// ---------------------------
+
 async function loadOrders() {
     const tbody = document.getElementById("ordersTableBody");
-    const countEl = document.getElementById("ordersCount");
     const t = translations[currentLang];
     
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">${t.loading}</td></tr>`;
@@ -541,43 +493,49 @@ async function loadOrders() {
             .order("created_at", { ascending: false });
             
         if (error) throw error;
-        
         currentOrders = data || [];
-        countEl.innerText = `${t.ordersCount}${currentOrders.length}`;
-        
-        renderOrdersTable();
+        filterOrders(); // Render with current filters if any
     } catch (err) {
-        console.error("Error loading orders:", err);
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger);">خطأ في تحميل البيانات.</td></tr>`;
     }
 }
 
-function renderOrdersTable() {
+function filterOrders() {
+    const searchInput = document.getElementById("searchOrdersInput")?.value.toLowerCase() || "";
+    const statusFilter = document.getElementById("filterOrderStatus")?.value || "all";
+
+    const filtered = currentOrders.filter(order => {
+        const matchesSearch = (order.customer_name && order.customer_name.toLowerCase().includes(searchInput)) || 
+                              (order.customer_phone && order.customer_phone.includes(searchInput));
+        const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    renderOrdersTable(filtered);
+}
+
+function renderOrdersTable(ordersToRender = currentOrders) {
     const tbody = document.getElementById("ordersTableBody");
+    const countEl = document.getElementById("ordersCount");
     const t = translations[currentLang];
     
-    if (currentOrders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-muted, #7A6E66); padding:20px;">لا يوجد طلبات حالياً.</td></tr>`;
+    countEl.innerText = `${t.ordersCount}${ordersToRender.length}`;
+    
+    if (ordersToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-muted); padding:20px;">${t.noSearchResults}</td></tr>`;
         return;
     }
     
-    tbody.innerHTML = currentOrders.map(order => {
+    tbody.innerHTML = ordersToRender.map(order => {
         const orderDate = new Date(order.created_at).toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", {
             year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
         });
         
         let statusClass = "status-pending";
         let statusText = t.statusPending;
-        if (order.status === "processing") {
-            statusClass = "status-processing";
-            statusText = t.statusProcessing;
-        } else if (order.status === "completed") {
-            statusClass = "status-completed";
-            statusText = t.statusCompleted;
-        } else if (order.status === "cancelled") {
-            statusClass = "status-cancelled";
-            statusText = t.statusCancelled;
-        }
+        if (order.status === "processing") { statusClass = "status-processing"; statusText = t.statusProcessing; } 
+        else if (order.status === "completed") { statusClass = "status-completed"; statusText = t.statusCompleted; } 
+        else if (order.status === "cancelled") { statusClass = "status-cancelled"; statusText = t.statusCancelled; }
         
         const totalCost = parseFloat(order.total_price) || 0;
         
@@ -586,7 +544,7 @@ function renderOrdersTable() {
             <td style="font-weight:700;">${order.customer_name}</td>
             <td><a href="tel:${order.customer_phone}">${order.customer_phone}</a></td>
             <td>${order.governorate}</td>
-            <td style="font-size:13px; color:var(--ink-muted, #7A6E66);">${orderDate}</td>
+            <td style="font-size:13px; color:var(--ink-muted);">${orderDate}</td>
             <td style="font-weight:800; color:var(--gold);">${totalCost.toFixed(2)} ${t.currency}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
@@ -598,7 +556,62 @@ function renderOrdersTable() {
     }).join("");
 }
 
-// Load Books
+function exportOrdersToCSV() {
+    const t = translations[currentLang];
+    if (currentOrders.length === 0) {
+        alert(t.noOrdersToExport);
+        return;
+    }
+
+    const headers = [t.thCustomerName, t.thPhone, t.thGov, t.thDate, t.thTotal, t.thStatus];
+    let csvContent = "\uFEFF" + headers.join(",") + "\n"; // BOM لدعم اللغة العربية في إكسيل
+
+    // Use currently filtered orders if search is active, otherwise all orders
+    const searchInput = document.getElementById("searchOrdersInput")?.value.toLowerCase() || "";
+    const statusFilter = document.getElementById("filterOrderStatus")?.value || "all";
+    const filteredOrders = currentOrders.filter(order => {
+        const matchesSearch = (order.customer_name && order.customer_name.toLowerCase().includes(searchInput)) || 
+                              (order.customer_phone && order.customer_phone.includes(searchInput));
+        const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    filteredOrders.forEach(order => {
+        const orderDate = new Date(order.created_at).toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", {
+            year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+        });
+        
+        let statusText = t.statusPending;
+        if (order.status === "processing") statusText = t.statusProcessing;
+        else if (order.status === "completed") statusText = t.statusCompleted;
+        else if (order.status === "cancelled") statusText = t.statusCancelled;
+
+        const row = [
+            `"${order.customer_name}"`,
+            `"${order.customer_phone}"`,
+            `"${order.governorate}"`,
+            `"${orderDate}"`,
+            `"${order.total_price || 0}"`,
+            `"${statusText}"`
+        ];
+        csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `dm_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ---------------------------
+// قسم الكتب والفلترة
+// ---------------------------
+
 async function loadBooks() {
     const tbody = document.getElementById("booksTableBody");
     const t = translations[currentLang];
@@ -612,25 +625,37 @@ async function loadBooks() {
             .order("created_at", { ascending: false });
             
         if (error) throw error;
-        
         currentBooks = data || [];
-        renderBooksTable();
+        filterBooks();
     } catch (err) {
-        console.error("Error loading books:", err);
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--danger);">خطأ في تحميل البيانات.</td></tr>`;
     }
 }
 
-function renderBooksTable() {
+function filterBooks() {
+    const searchInput = document.getElementById("searchBooksInput")?.value.toLowerCase() || "";
+    const catFilter = document.getElementById("filterBookCategory")?.value || "all";
+
+    const filtered = currentBooks.filter(book => {
+        const matchesSearch = (book.title && book.title.toLowerCase().includes(searchInput)) || 
+                              (book.author && book.author.toLowerCase().includes(searchInput));
+        const matchesCat = catFilter === "all" || book.category === catFilter;
+        return matchesSearch && matchesCat;
+    });
+
+    renderBooksTable(filtered);
+}
+
+function renderBooksTable(booksToRender = currentBooks) {
     const tbody = document.getElementById("booksTableBody");
     const t = translations[currentLang];
     
-    if (currentBooks.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-light); padding:20px;">لا يوجد كتب مضافة حالياً.</td></tr>`;
+    if (booksToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-light); padding:20px;">${t.noSearchResults}</td></tr>`;
         return;
     }
     
-    tbody.innerHTML = currentBooks.map(book => {
+    tbody.innerHTML = booksToRender.map(book => {
         const isAr = book.language === "ar";
         const inStockVal = book.in_stock !== false;
         
@@ -638,8 +663,7 @@ function renderBooksTable() {
         if (book._coverUploading) {
             coverHtml = `<div class="admin-table-img admin-cover-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
         } else if (book.image_url) {
-            const thumb =
-                window.dmBooks?.bookCoverUrl && book.image_url.includes("supabase.co/storage")
+            const thumb = window.dmBooks?.bookCoverUrl && book.image_url.includes("supabase.co/storage")
                     ? window.dmBooks.bookCoverUrl(book.image_url, 80)
                     : book.image_url;
             coverHtml = `<img src="${thumb}" alt="${book.title}" class="admin-table-img" loading="lazy" decoding="async">`;
@@ -658,12 +682,12 @@ function renderBooksTable() {
             <td>${isAr ? t.arLangName : t.enLangName}</td>
             <td style="font-weight:800;">${book.price} ${t.currency}</td>
             <td>
-                <button class="status-badge" style="background:${inStockVal ? 'var(--success-light)' : 'var(--danger-light)'}; color:${inStockVal ? 'var(--success)' : 'var(--danger)'}; cursor:pointer;" onclick="toggleBookStock('${book.id}', ${inStockVal})">
+                <button class="status-badge" style="background:${inStockVal ? 'var(--success-light, #d4edda)' : 'var(--danger-light, #f8d7da)'}; color:${inStockVal ? 'var(--success)' : 'var(--danger)'}; cursor:pointer;" onclick="toggleBookStock('${book.id}', ${inStockVal})">
                     ${inStockVal ? t.inStock : t.outOfStock}
                 </button>
             </td>
             <td>
-                <button class="action-btn" style="color:var(--danger); border:none; box-shadow:none;" onclick="deleteBook('${book.id}')" title="${t.thBookActions}">
+                <button class="action-btn" style="color:var(--danger); border:none; background:transparent; cursor:pointer;" onclick="deleteBook('${book.id}')" title="${t.thBookActions}">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </td>
@@ -671,51 +695,35 @@ function renderBooksTable() {
     }).join("");
 }
 
-// Toggle Book Availability
+// ---------------------------
+// باقي وظائف الإضافة والحذف
+// ---------------------------
+
 async function toggleBookStock(bookId, currentVal) {
     try {
-        const { error } = await getSb()
-            .from("books")
-            .update({ in_stock: !currentVal })
-            .eq("id", bookId);
-            
+        const { error } = await getSb().from("books").update({ in_stock: !currentVal }).eq("id", bookId);
         if (error) throw error;
         
-        // Refresh local array
         const book = currentBooks.find(b => b.id === bookId);
         if (book) book.in_stock = !currentVal;
-        
-        renderBooksTable();
-    } catch (err) {
-        console.error("Error toggling book stock:", err);
-    }
+        filterBooks();
+    } catch (err) {}
 }
 
-// Delete Book
 async function deleteBook(bookId) {
     const t = translations[currentLang];
     if (!confirm(t.bookDeleteConfirm)) return;
     
     try {
-        const { error } = await getSb()
-            .from("books")
-            .delete()
-            .eq("id", bookId);
-            
+        const { error } = await getSb().from("books").delete().eq("id", bookId);
         if (error) throw error;
         
         currentBooks = currentBooks.filter(b => b.id !== bookId);
-        renderBooksTable();
-    } catch (err) {
-        console.error("Error deleting book:", err);
-        alert(currentLang === "ar" ? "فشل حذف الكتاب." : "Failed to delete book.");
-    }
+        filterBooks();
+    } catch (err) {}
 }
 
-// Modals: Add Book
-function openAddBookModal() {
-    document.getElementById("addBookModal").classList.add("open");
-}
+function openAddBookModal() { document.getElementById("addBookModal").classList.add("open"); }
 
 function closeAddBookModal() {
     document.getElementById("addBookModal").classList.remove("open");
@@ -725,24 +733,16 @@ function closeAddBookModal() {
 
 function clearPreparedCover() {
     preparedCoverBlob = null;
-    if (preparedCoverPreviewUrl) {
-        URL.revokeObjectURL(preparedCoverPreviewUrl);
-        preparedCoverPreviewUrl = null;
-    }
+    if (preparedCoverPreviewUrl) { URL.revokeObjectURL(preparedCoverPreviewUrl); preparedCoverPreviewUrl = null; }
     const preview = document.getElementById("bookCoverPreview");
-    if (preview) {
-        preview.src = "#";
-        preview.style.display = "none";
-    }
+    if (preview) { preview.src = "#"; preview.style.display = "none"; }
     const promptText = document.getElementById("uploadPromptText");
     if (promptText) promptText.style.display = "block";
     const hint = document.getElementById("coverCompressHint");
     if (hint) hint.hidden = true;
 }
 
-function triggerFileInput() {
-    document.getElementById("bookCoverFile").click();
-}
+function triggerFileInput() { document.getElementById("bookCoverFile").click(); }
 
 async function previewImage(e) {
     const file = e.target.files[0];
@@ -753,66 +753,46 @@ async function previewImage(e) {
     clearPreparedCover();
     if (!file) return;
 
-    if (hint) {
-        hint.hidden = false;
-        hint.textContent = currentLang === "ar" ? "جاري تحضير الصورة..." : "Preparing image...";
-    }
+    if (hint) { hint.hidden = false; hint.textContent = currentLang === "ar" ? "جاري تحضير الصورة..." : "Preparing image..."; }
 
     try {
         const compress = window.dmImageUtils?.compressCoverImage;
         preparedCoverBlob = compress ? await compress(file) : file;
 
-        if (preparedCoverPreviewUrl) URL.revokeObjectURL(preparedCoverPreviewUrl);
         preparedCoverPreviewUrl = URL.createObjectURL(preparedCoverBlob);
-
         preview.src = preparedCoverPreviewUrl;
         preview.style.display = "inline-block";
         promptText.style.display = "none";
 
         if (hint) {
             const kb = Math.round(preparedCoverBlob.size / 1024);
-            const origKb = Math.round(file.size / 1024);
-            hint.textContent =
-                currentLang === "ar"
-                    ? `جاهزة للرفع السريع (${kb} ك.ب${origKb > kb ? ` — كانت ${origKb} ك.ب` : ""})`
-                    : `Ready (${kb} KB${origKb > kb ? `, was ${origKb} KB` : ""})`;
+            hint.textContent = currentLang === "ar" ? `جاهزة للرفع (${kb} ك.ب)` : `Ready (${kb} KB)`;
         }
     } catch (err) {
-        console.warn("cover prep", err);
         preparedCoverBlob = file;
         if (hint) hint.hidden = true;
     }
 }
 
-/** رفع الغلاف وتحديث السجل — لا يعيق إغلاق النموذج */
 async function uploadCoverInBackground(bookId, blob) {
     if (!blob || !bookId) return;
     const sb = getSb();
     const filePath = `covers/${bookId}.jpg`;
 
-    const { error: uploadError } = await sb.storage.from("book-covers").upload(filePath, blob, {
-        contentType: "image/jpeg",
-        cacheControl: "31536000",
-        upsert: true,
-    });
+    const { error: uploadError } = await sb.storage.from("book-covers").upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: urlData } = sb.storage.from("book-covers").getPublicUrl(filePath);
-    const imageUrl = urlData.publicUrl;
-
-    const { error: updateError } = await sb.from("books").update({ image_url: imageUrl }).eq("id", bookId);
-    if (updateError) throw updateError;
+    await sb.from("books").update({ image_url: urlData.publicUrl }).eq("id", bookId);
 
     const book = currentBooks.find((b) => b.id === bookId);
     if (book) {
-        book.image_url = imageUrl;
+        book.image_url = urlData.publicUrl;
         book._coverUploading = false;
-        renderBooksTable();
+        filterBooks();
     }
-    if (window.dmBooks?.clearCache) window.dmBooks.clearCache();
 }
 
-// Submit New Book — حفظ فوري ثم رفع الغلاف بالخلفية
 async function submitNewBook(e) {
     e.preventDefault();
     const t = translations[currentLang];
@@ -831,86 +811,49 @@ async function submitNewBook(e) {
     const fileInput = document.getElementById("bookCoverFile");
     const rawFile = fileInput.files[0];
 
-    let coverBlob = preparedCoverBlob;
-    if (rawFile && !coverBlob) {
-        try {
-            const compress = window.dmImageUtils?.compressCoverImage;
-            coverBlob = compress ? await compress(rawFile) : rawFile;
-        } catch {
-            coverBlob = rawFile;
-        }
-    }
+    let coverBlob = preparedCoverBlob || rawFile;
 
     try {
-        const { data: inserted, error: insertError } = await getSb()
+        const { data: inserted, error } = await getSb()
             .from("books")
-            .insert([
-                {
-                    title,
-                    author,
-                    price,
-                    category,
-                    language,
-                    description,
-                    image_url: null,
-                    in_stock: true,
-                },
-            ])
-            .select("id,title,author,price,category,language,description,image_url,in_stock,created_at")
-            .single();
+            .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
+            .select().single();
 
-        if (insertError) throw insertError;
+        if (error) throw error;
 
         const newBook = inserted;
         if (coverBlob) newBook._coverUploading = true;
 
         currentBooks.unshift(newBook);
-        if (activeTab !== "books") switchTab("books");
-        else renderBooksTable();
-
-        if (window.dmBooks?.clearCache) window.dmBooks.clearCache();
+        if (activeTab !== "books") switchTab("books"); else filterBooks();
 
         closeAddBookModal();
 
         if (coverBlob && newBook.id) {
-            uploadCoverInBackground(newBook.id, coverBlob).catch((err) => {
-                console.error("Background cover upload:", err);
+            uploadCoverInBackground(newBook.id, coverBlob).catch(() => {
                 const b = currentBooks.find((x) => x.id === newBook.id);
-                if (b) {
-                    b._coverUploading = false;
-                    renderBooksTable();
-                }
+                if (b) { b._coverUploading = false; filterBooks(); }
             });
         }
     } catch (err) {
-        console.error("Error creating book:", err);
-        alert(
-            currentLang === "ar"
-                ? "فشل إضافة الكتاب: " + (err.message || "")
-                : "Failed to add book: " + (err.message || "")
-        );
+        alert(currentLang === "ar" ? "فشل الإضافة" : "Failed to add book");
     } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML = originalBtn;
     }
 }
 
-// Modal: Order Details
+// ---------------------------
+// تفاصيل الطلب وتحديث الحالة
+// ---------------------------
+
 async function openOrderDetailsModal(orderId) {
     selectedOrderId = orderId;
     const modal = document.getElementById("orderDetailsModal");
     const t = translations[currentLang];
     
-    // Clear details display
     document.getElementById("detCustName").innerText = t.loading;
     document.getElementById("detCustPhone").innerText = "-";
-    document.getElementById("detCustGov").innerText = "-";
-    document.getElementById("detCustAddress").innerText = "-";
-    document.getElementById("detCustNotes").innerText = "-";
-    document.getElementById("detOrderDate").innerText = "-";
-    document.getElementById("detSubtotalPrice").innerText = `0 ${t.currency}`;
-    document.getElementById("detShippingPrice").innerText = `0 ${t.currency}`;
-    document.getElementById("detTotalPrice").innerText = `0 ${t.currency}`;
     document.getElementById("detOrderItemsBody").innerHTML = `<tr><td colspan="4" style="text-align:center;">${t.loading}</td></tr>`;
     
     modal.classList.add("open");
@@ -918,7 +861,6 @@ async function openOrderDetailsModal(orderId) {
     const order = currentOrders.find(o => o.id === orderId);
     if (!order) return;
     
-    // Render Customer Metadata
     document.getElementById("detCustName").innerText = order.customer_name;
     document.getElementById("detCustPhone").innerText = order.customer_phone;
     document.getElementById("detCustPhone").href = `tel:${order.customer_phone}`;
@@ -926,55 +868,28 @@ async function openOrderDetailsModal(orderId) {
     document.getElementById("detCustAddress").innerText = order.address;
     document.getElementById("detCustNotes").innerText = order.notes || (currentLang === "ar" ? "لا يوجد" : "None");
     
-    const orderDate = new Date(order.created_at).toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", {
-        year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
-    });
+    const orderDate = new Date(order.created_at).toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     document.getElementById("detOrderDate").innerText = orderDate;
     document.getElementById("detOrderStatusSelect").value = order.status;
     
-    // Get Order Items joined with Book title
     try {
-        const { data, error } = await getSb()
-            .from("order_items")
-            .select(`
-                id,
-                quantity,
-                price,
-                books (
-                    title,
-                    author
-                )
-            `)
-            .eq("order_id", orderId);
-            
+        const { data, error } = await getSb().from("order_items").select(`id, quantity, price, books (title, author)`).eq("order_id", orderId);
         if (error) throw error;
         
-        const items = data || [];
         let itemsSubtotal = 0;
-        
-        document.getElementById("detOrderItemsBody").innerHTML = items.map(item => {
+        document.getElementById("detOrderItemsBody").innerHTML = (data || []).map(item => {
             const itemTitle = item.books ? item.books.title : (currentLang === "ar" ? "كتاب غير معروف" : "Unknown Book");
             const itemTotal = item.price * item.quantity;
             itemsSubtotal += itemTotal;
-            
-            return `
-            <tr>
-                <td style="font-weight:700;">${itemTitle}</td>
-                <td>${item.quantity}</td>
-                <td>${item.price} ${t.currency}</td>
-                <td style="font-weight:700;">${itemTotal.toFixed(2)} ${t.currency}</td>
-            </tr>`;
+            return `<tr><td style="font-weight:700;">${itemTitle}</td><td>${item.quantity}</td><td>${item.price} ${t.currency}</td><td style="font-weight:700;">${itemTotal.toFixed(2)} ${t.currency}</td></tr>`;
         }).join("");
         
         const shipping = parseFloat(order.shipping_cost);
-        const total = itemsSubtotal + shipping;
-        
         document.getElementById("detSubtotalPrice").innerText = `${itemsSubtotal.toFixed(2)} ${t.currency}`;
         document.getElementById("detShippingPrice").innerText = `${shipping.toFixed(2)} ${t.currency}`;
-        document.getElementById("detTotalPrice").innerText = `${total.toFixed(2)} ${t.currency}`;
+        document.getElementById("detTotalPrice").innerText = `${(itemsSubtotal + shipping).toFixed(2)} ${t.currency}`;
     } catch (err) {
-        console.error("Error loading order items:", err);
-        document.getElementById("detOrderItemsBody").innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger);">خطأ في تحميل تفاصيل المشتريات.</td></tr>`;
+        document.getElementById("detOrderItemsBody").innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger);">خطأ في التحميل.</td></tr>`;
     }
 }
 
@@ -983,50 +898,26 @@ function closeOrderDetailsModal() {
     selectedOrderId = null;
 }
 
-// Update Order Status
 async function updateOrderStatus() {
     if (!selectedOrderId) return;
-    
-    const select = document.getElementById("detOrderStatusSelect");
-    const newStatus = select.value;
-    
+    const newStatus = document.getElementById("detOrderStatusSelect").value;
     try {
-        const { error } = await getSb()
-            .from("orders")
-            .update({ status: newStatus })
-            .eq("id", selectedOrderId);
-            
-        if (error) throw error;
-        
-        // Update locally
+        await getSb().from("orders").update({ status: newStatus }).eq("id", selectedOrderId);
         const order = currentOrders.find(o => o.id === selectedOrderId);
         if (order) order.status = newStatus;
-        
-        renderOrdersTable();
-    } catch (err) {
-        console.error("Error updating order status:", err);
-    }
+        filterOrders();
+    } catch (err) {}
 }
 
-// Delete Order
 async function deleteOrder() {
     if (!selectedOrderId) return;
     const t = translations[currentLang];
     if (!confirm(t.deleteConfirm)) return;
     
     try {
-        const { error } = await getSb()
-            .from("orders")
-            .delete()
-            .eq("id", selectedOrderId);
-            
-        if (error) throw error;
-        
+        await getSb().from("orders").delete().eq("id", selectedOrderId);
         currentOrders = currentOrders.filter(o => o.id !== selectedOrderId);
-        renderOrdersTable();
+        filterOrders();
         closeOrderDetailsModal();
-    } catch (err) {
-        console.error("Error deleting order:", err);
-        alert(currentLang === "ar" ? "فشل حذف الطلب." : "Failed to delete order.");
-    }
+    } catch (err) {}
 }

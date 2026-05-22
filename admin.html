@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>dm | لوحة تحكم الأدمن</title>
+  <title>dm | لوحة تحكم الأدمن المطورة</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body class="admin-body">
   <main class="admin-root">
 
+    <!-- ================= حالة تسجيل الدخول ================= -->
     <section id="adminLoginState" class="admin-login-wrap">
       <div class="admin-login-card uiglass-admin">
         <a href="index.html" class="admin-login-back"><i class="fa-solid fa-arrow-right"></i> العودة للمتجر</a>
@@ -44,7 +45,9 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
       </div>
     </section>
 
+    <!-- ================= لوحة التحكم الرئيسية ================= -->
     <section id="adminDashboardState" class="admin-layout" style="display:none;">
+      <!-- القائمة الجانبية -->
       <aside class="admin-sidebar">
         <div class="admin-sidebar-title">
           <img src="assets/logo.png" alt="" class="admin-sidebar-logo">
@@ -64,15 +67,38 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
         </ul>
       </aside>
 
+      <!-- محتوى لوحة التحكم -->
       <div class="admin-content">
+        
+        <!-- قسم الطلبات الواردة -->
         <div id="paneOrders" class="admin-pane">
           <div class="admin-pane-header admin-card">
             <div>
               <h3 id="ordersPaneTitle">الطلبات الواردة</h3>
               <p id="ordersCount" class="admin-stat">العدد: 0</p>
             </div>
-            <button type="button" class="btn btn-outline" onclick="loadOrders()"><i class="fa-solid fa-rotate"></i> تحديث</button>
+            <div class="admin-actions-group" style="display: flex; gap: 10px;">
+              <button type="button" class="btn btn-success" onclick="exportOrdersToCSV()"><i class="fa-solid fa-file-csv"></i> تصدير تقرير</button>
+              <button type="button" class="btn btn-outline" onclick="loadOrders()"><i class="fa-solid fa-rotate"></i> تحديث</button>
+            </div>
           </div>
+
+          <!-- شريط الفلترة والبحث للطلبات (جديد) -->
+          <div class="admin-filter-bar admin-card" style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+              <input type="text" id="searchOrdersInput" placeholder="بحث باسم العميل أو الهاتف..." oninput="filterOrders()">
+            </div>
+            <div class="form-group" style="min-width: 150px; margin: 0;">
+              <select id="filterOrderStatus" onchange="filterOrders()">
+                <option value="all">كل الحالات</option>
+                <option value="pending">قيد الانتظار</option>
+                <option value="processing">جاري التجهيز</option>
+                <option value="completed">تم التوصيل</option>
+                <option value="cancelled">ملغي</option>
+              </select>
+            </div>
+          </div>
+
           <div class="admin-table-container admin-card">
             <table class="admin-table">
               <thead>
@@ -86,16 +112,39 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                   <th id="thActions">إجراءات</th>
                 </tr>
               </thead>
-              <tbody id="ordersTableBody"></tbody>
+              <tbody id="ordersTableBody">
+                <!-- انيميشن تحميل افتراضي -->
+                <tr class="table-loading-row"><td colspan="7" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل الطلبات...</td></tr>
+              </tbody>
             </table>
           </div>
         </div>
 
+        <!-- قسم إدارة الكتب -->
         <div id="paneBooks" class="admin-pane" style="display:none;">
           <div class="admin-pane-header admin-card">
             <h3 id="booksPaneTitle">إدارة الكتب</h3>
             <button type="button" class="btn btn-primary" onclick="openAddBookModal()"><i class="fa-solid fa-plus"></i> <span id="btnAddBookBtn2">كتاب جديد</span></button>
           </div>
+
+          <!-- شريط تصفية وبحث الكتب (جديد) -->
+          <div class="admin-filter-bar admin-card" style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+              <input type="text" id="searchBooksInput" placeholder="بحث عن كتاب أو كاتب..." oninput="filterBooks()">
+            </div>
+            <div class="form-group" style="min-width: 150px; margin: 0;">
+              <select id="filterBookCategory" onchange="filterBooks()">
+                <option value="all">كل التصنيفات</option>
+                <option value="novels">روايات</option>
+                <option value="religious">كتب دينية</option>
+                <option value="self-development">تنمية بشرية</option>
+                <option value="children">كتب أطفال</option>
+                <option value="science">علوم وتكنولوجيا</option>
+                <option value="history">تاريخ وسير</option>
+              </select>
+            </div>
+          </div>
+
           <div class="admin-table-container admin-card">
             <table class="admin-table">
               <thead>
@@ -110,13 +159,17 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                   <th id="thBookActions">حذف</th>
                 </tr>
               </thead>
-              <tbody id="booksTableBody"></tbody>
+              <tbody id="booksTableBody">
+                <!-- انيميشن تحميل افتراضي -->
+                <tr class="table-loading-row"><td colspan="8" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل الكتب...</td></tr>
+              </tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- ================= مودال: إضافة كتاب جديد ================= -->
     <div class="modal" id="addBookModal">
       <div class="modal-content admin-card">
         <div class="modal-header">
@@ -167,6 +220,7 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
       </div>
     </div>
 
+    <!-- ================= مودال: تفاصيل الطلب ================= -->
     <div class="modal" id="orderDetailsModal">
       <div class="modal-content admin-card" style="max-width:750px;">
         <div class="modal-header">
@@ -227,6 +281,7 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
 
   </main>
 
+  <!-- السكربتات الخارجية -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
   <script src="js/books-store.js"></script>

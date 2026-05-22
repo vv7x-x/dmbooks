@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>حسابي — dm</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="mainHeader">
+    <div class="header-container">
+      <a href="/index.html" class="logo">
+        <div class="logo-icon"><i class="fa-solid fa-book-open"></i></div>
+        <div class="logo-text">dm<span>.</span></div>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="/index.html" id="navHome">الرئيسية</a></li>
+        <li><a href="/index.html#catalog" id="navCatalog">كتالوج الكتب</a></li>
+        <li><a href="/contact.html" id="navContact">تواصل معنا</a></li>
+        <li><a href="/auth/login.html" id="navLogin">تسجيل دخول</a></li>
+        <li><a href="/auth/register.html" id="navRegister">تسجيل جديد</a></li>
+        <li><a href="/account/profile.html" id="navAccount">حسابي</a></li>
+      </ul>
+
+      <div class="header-actions"></div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 120px; padding-bottom: 80px;">
+        <h2 style="font-family:var(--font-display-ar); font-size:32px; color:var(--walnut); margin-bottom:32px;">الملف الشخصي</h2>
+
+        <div id="profileCard" class="profile-card" style="margin:0;">
+            <div class="profile-row">
+                <div class="profile-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></div>
+                <div class="profile-fields">
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block; margin-bottom:6px; color:var(--ink-muted); font-size:13px; font-weight:700;">البريد الإلكتروني</label>
+                        <p style="font-weight:800; color:var(--walnut); font-size:16px;"><span id="profileEmail">-</span></p>
+                    </div>
+
+                    <div>
+                        <label for="profileName" style="display:block; margin-bottom:8px; font-weight:700; color:var(--walnut); font-size:14px;">الاسم الكامل</label>
+                        <input id="profileName" placeholder="أدخل اسمك الكامل" style="height:48px;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:32px; display:flex; gap:12px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="updateProfile()" style="flex:1; min-width:150px;">
+                    <i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات
+                </button>
+                <a class="btn btn-outline" href="/account/orders.html" style="flex:1; min-width:150px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> تاريخ طلباتي
+                </a>
+                <button class="btn btn-secondary" onclick="authSignOut()" style="min-width:120px;">
+                    <i class="fa-solid fa-right-from-bracket"></i> خروج
+                </button>
+            </div>
+        </div>
+    </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/session.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

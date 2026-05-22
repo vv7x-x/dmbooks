@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تواصل معنا — dm</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="mainHeader">
+    <div class="header-container">
+      <a href="index.html" class="logo">
+        <div class="logo-icon"><i class="fa-solid fa-book-open"></i></div>
+        <div class="logo-text">dm<span>.</span></div>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="index.html" id="navHome">الرئيسية</a></li>
+        <li><a href="index.html#catalog" id="navCatalog">كتالوج الكتب</a></li>
+        <li><a href="contact.html" id="navContact">تواصل معنا</a></li>
+        <li><a href="auth/login.html" id="navLogin">تسجيل دخول</a></li>
+        <li><a href="auth/register.html" id="navRegister">تسجيل جديد</a></li>
+        <li><a href="account/profile.html" id="navAccount">حسابي</a></li>
+      </ul>
+
+      <div class="header-actions">
+        <button class="lang-switch-btn" id="langSwitch" onclick="toggleLanguage()">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <h2>تواصل معنا</h2>
+    <div class="card">
+      <p>البريد الإلكتروني: support@dm-books.com</p>
+      <p>الهاتف: +20 1559215694</p>
+      <form id="contactForm">
+        <label>الاسم</label><input required>
+        <label>البريد</label><input type="email" required>
+        <label>الرسالة</label><textarea required></textarea>
+        <button class="btn btn-primary">إرسال</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-col">
+        <a href="index.html" class="logo" style="margin-bottom: 24px; display: inline-flex;">
+          <div class="logo-icon" style="width: 40px; height: 40px; font-size: 16px;"><i class="fa-solid fa-book-open"></i></div>
+          <div class="logo-text" style="color: var(--cream); font-size: 26px;">dm<span style="color: var(--gold);">.</span></div>
+        </a>
+        <p id="footerAbout">بوابتك لعالم المعرفة والقصص الملهمة. نوفر تشكيلة مميزة من الكتب العربية والإنجليزية التي تُثري عقول القراء في جميع أنحاء الوطن العربي.</p>
+        <div class="social-links">
+          <a href="https://www.instagram.com/dmbookstore/" target="_blank" class="social-icon"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://wa.me/201559215694" target="_blank" class="social-icon"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="https://facebook.com/" target="_blank" class="social-icon"><i class="fa-brands fa-facebook-f"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4 id="footerQuickLinks">روابط سريعة</h4>
+        <ul class="footer-links">
+          <li><a href="index.html" id="footerLinkHome">الرئيسية</a></li>
+          <li><a href="index.html#catalog" id="footerLinkCatalog">كتالوج الكتب</a></li>
+          <li><a href="contact.html" id="footerLinkContact">تواصل معنا</a></li>
+          <li><a href="auth/login.html" id="footerLinkLogin">تسجيل دخول</a></li>
+          <li><a href="auth/register.html" id="footerLinkRegister">تسجيل جديد</a></li>
+          <li><a href="terms.html" id="footerLinkTerms">الشروط والأحكام</a></li>
+          <li><a href="privacy.html" id="footerLinkPrivacy">سياسة الخصوصية</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4 id="footerCategoriesTitle">التصنيفات</h4>
+        <ul class="footer-links">
+          <li><a href="index.html#catalog" onclick="selectCategory('novels')" id="footerCatNovels">روايات</a></li>
+          <li><a href="index.html#catalog" onclick="selectCategory('religious')" id="footerCatRel">كتب دينية</a></li>
+          <li><a href="index.html#catalog" onclick="selectCategory('self-development')" id="footerCatSelf">تنمية بشرية</a></li>
+          <li><a href="index.html#catalog" onclick="selectCategory('children')" id="footerCatChild">كتب أطفال</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4 id="footerContactTitle">تواصل معنا</h4>
+        <div class="footer-contact">
+          <div class="contact-item">
+            <i class="fa-solid fa-envelope"></i>
+            <span>support@dm-books.com</span>
+          </div>
+          <div class="contact-item">
+            <i class="fa-solid fa-phone"></i>
+            <span>+20 100 000 0000</span>
+          </div>
+          <div class="contact-item">
+            <i class="fa-solid fa-location-dot"></i>
+            <span id="footerLocation">القاهرة، جمهورية مصر العربية</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p id="footerCopyright">© 2026 مكتبة dm. جميع الحقوق محفوظة.</p>
+      <p id="footerCOD" style="color: var(--gold); font-weight: 700;"><i class="fa-solid fa-truck-fast"></i> الدفع عند الاستلام في جميع المحافظات</p>
+    </div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/session.js"></script>
+</body>
+</html>

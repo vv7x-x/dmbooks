@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>طلباتي — dm</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header id="mainHeader">
+        <div class="header-container">
+            <a href="/index.html" class="logo">
+                <div class="logo-icon"><i class="fa-solid fa-book-open"></i></div>
+                <div class="logo-text">dm<span>.</span></div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="/index.html" id="navHome">الرئيسية</a></li>
+                <li><a href="/index.html#catalog" id="navCatalog">كتالوج الكتب</a></li>
+                <li><a href="/contact.html" id="navContact">تواصل معنا</a></li>
+                <li><a href="/auth/login.html" id="navLogin">تسجيل دخول</a></li>
+                <li><a href="/auth/register.html" id="navRegister">تسجيل جديد</a></li>
+                <li><a href="/account/profile.html" id="navAccount">حسابي</a></li>
+            </ul>
+
+            <div class="header-actions">
+                <!-- Session.js will append items here -->
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 120px; padding-bottom: 80px;">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:32px;">
+            <a href="/account/profile.html" class="btn-circle" style="background:var(--parchment); color:var(--walnut);"><i class="fa-solid fa-arrow-right"></i></a>
+            <h2 style="font-family:var(--font-display-ar); font-size:32px; color:var(--walnut);">تاريخ طلباتي</h2>
+        </div>
+
+        <div id="userOrders">
+            <div style="text-align:center; padding: 60px 0;">
+                <i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:var(--gold);"></i>
+                <p style="margin-top:16px; color:var(--ink-muted);">جاري تحميل طلباتك...</p>
+            </div>
+        </div>
+    </main>
+
+    <footer style="margin-top: 80px;">
+        <div class="footer-bottom" style="border-top:none;">
+            <p>© 2026 مكتبة dm. جميع الحقوق محفوظة.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/supabase-config.js"></script>
+    <script src="/js/session.js"></script>
+    <script src="/js/auth.js"></script>
+</body>
+</html>

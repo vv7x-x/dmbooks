@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>إنشاء حساب — dm</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <h2>إنشاء حساب جديد</h2>
+      <form id="registerForm" onsubmit="authSignUp(event)">
+        <label for="regEmail">البريد الإلكتروني</label>
+        <input id="regEmail" type="email" required placeholder="you@domain.com">
+
+        <label for="regPassword">كلمة المرور</label>
+        <input id="regPassword" type="password" required placeholder="اختر كلمة مرور قوية">
+
+        <div class="auth-actions">
+          <button class="btn btn-primary" type="submit">إنشاء الحساب</button>
+          <a class="btn btn-outline" href="/auth/login.html">تسجيل دخول</a>
+        </div>
+      </form>
+      <p class="auth-note">بالتسجيل ستتلقى رسالة تأكيد على بريدك الإلكتروني إذا تطلب الأمر.</p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

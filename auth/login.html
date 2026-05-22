@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تسجيل الدخول — dm</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <h2>تسجيل الدخول</h2>
+      <form id="loginForm" onsubmit="authSignIn(event)">
+        <label for="loginEmail">البريد الإلكتروني</label>
+        <input id="loginEmail" type="email" required placeholder="you@domain.com">
+
+        <label for="loginPassword">كلمة المرور</label>
+        <input id="loginPassword" type="password" required placeholder="أدخل كلمة المرور">
+
+        <div class="auth-actions">
+          <button class="btn btn-primary" type="submit">دخول</button>
+          <a class="btn btn-outline" href="/auth/register.html">إنشاء حساب</a>
+        </div>
+      </form>
+      <p class="auth-note"><a href="/auth/reset-password.html">نسيت كلمة المرور؟</a></p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-config.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

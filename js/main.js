@@ -110,6 +110,13 @@ const translations = {
     }
 };
 
+// إضافة هذا السطر لتجنب الخطأ إذا لم تكن الدالة موجودة
+if (typeof filterBooks !== 'function') {
+    window.filterBooks = function() {
+        console.warn("filterBooks is not defined in this scope, skipping...");
+    };
+}
+
 let currentLang = localStorage.getItem("lang") || "ar";
 let allBooks = [];
 let booksLoading = false;

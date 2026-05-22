@@ -1,5 +1,4 @@
--- Supabase initialization SQL for dm bookstore (نسخة أساسية)
--- ⚠️ للإصلاح الكامل والسياسات المحدّثة شغّل: supabase/fix-database.sql
+-- Supabase initialization SQL for dm bookstore
 -- Run this in Supabase SQL Editor or via psql (with service role DB connection)
 
 -- 1. UUID extension

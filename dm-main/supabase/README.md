@@ -1,33 +1,65 @@
-# قاعدة بيانات dm — Supabase
+# قاعدة بيانات dm — Supabase (الباك اند)
 
-## التثبيت السريع
+## التثبيت السريع (مشروع جديد)
 
-1. افتح [Supabase Dashboard](https://supabase.com/dashboard) → مشروعك → **SQL Editor**
-2. انسخ محتوى **`fix-database.sql`** بالكامل والصقه → **Run**
-3. انسخ محتوى **`admin-fix.sql`** والصقه → **Run** (دخول الأدمن + تخزين الصور)
-4. من **Authentication → Users** أنشئ مستخدم الأدمن (أو سجّل من الموقع)
-5. نفّذ (استبدل البريد):
+في **Supabase → SQL Editor** شغّل بالترتيب:
+
+| # | الملف | الغرض |
+|---|--------|--------|
+| 1 | **`fix-database.sql`** | جداول + RLS + `place_order` + Storage |
+| 2 | **`backend-fix.sql`** | إصلاح مشروع قديم أو تأكيد السياسات (آمن إعادة التشغيله) |
+
+> مشروع **جديد**: يكفي `fix-database.sql` فقط.  
+> مشروع **كان شغّال وفيه مشاكل**: شغّل `backend-fix.sql`.
+
+بعد التشغيل: **Settings → API → Reload schema** (أو انتظر ~60 ثانية).
+
+### إضافة مشرف
 
 ```sql
 INSERT INTO public.admin_users (user_id)
-SELECT id FROM auth.users WHERE email = 'admin@dm.com' LIMIT 1;
+SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com' LIMIT 1;
 ```
 
-ثم افتح: http://localhost:3000/admin.html
+---
 
-## ماذا يفعل `fix-database.sql`؟
+## ماذا يوفّر الباك اند؟
 
 | المكوّن | الوصف |
 |---------|--------|
-| `books` | كتالوج المتجر + 5 كتب تجريبية إن كان فارغاً |
-| `orders` | طلبات مع `user_id` و `customer_email` |
-| `order_items` | عناصر كل طلب |
+| `books` | كتالوج المتجر |
+| `orders` / `order_items` | الطلبات |
 | `profiles` | ملف المستخدم + محفز تلقائي عند التسجيل |
+| `admin_users` | قائمة المشرفين |
 | `contact_messages` | رسائل صفحة التواصل |
-| `admin_users` | قائمة مشرفين لوحة الأدمن |
-| RLS | سياسات آمنة: ضيف يطلب، مستخدم يرى طلباته، أدمن يدير الكل |
+| `place_order()` | إنشاء طلب آمن للضيف والمسجّل (Checkout) |
+| `check_is_admin()` | التحقق من صلاحية الأدمن |
+| `book-covers` | bucket لصور الأغلفة |
 
-## ملفات أخرى
+---
 
-- `init.sql` — النسخة القديمة (للمرجع فقط)
-- `../scripts/setup-supabase.js` — إنشاء مستخدم أدمن عبر API
+## إصلاحات الأمان (backend-fix)
+
+- **Checkout:** الضيف لا يستطيع `SELECT` بعد `INSERT` — الحل: دالة `place_order` بـ `SECURITY DEFINER`.
+- **طلبات anon:** إزالة `UPDATE` عن الزوار؛ الإدراج المباشر للطلبات محدود بـ `user_id`.
+- **order_items:** الزوار يمرّون عبر `place_order` فقط؛ المسجّل يربط العناصر بطلبه.
+- **التحقق من الكتب:** `place_order` يرفض كتباً غير متوفرة (`book_unavailable`).
+
+---
+
+## اختبار سريع
+
+```sql
+-- يجب أن ترجع true بعد إضافة admin_users
+SELECT public.check_is_admin();
+
+-- يجب أن تظهر الدالة
+SELECT proname FROM pg_proc WHERE proname = 'place_order';
+```
+
+---
+
+## الملفات القديمة
+
+- `init.sql` — مرجع قديم فقط
+- `checkout-fix.sql` / `admin-fix.sql` — مُوجّهة إلى `backend-fix.sql`

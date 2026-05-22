@@ -31,6 +31,8 @@ const translations = {
         successHomeBtn: "<i class='fa-solid fa-house'></i> العودة للرئيسية",
         cartEmptyAlert: "سلة المشتريات فارغة! لا يمكن إتمام الشراء.",
         orderSubmitError: "حدث خطأ أثناء إرسال طلبك. يرجى المحاولة لاحقاً.",
+        networkError: "عذراً، حدث خطأ في الاتصال بالسيرفر. يرجى المحاولة مرة أخرى.",
+        requestTimeout: "انتهت مهلة الاتصال. تحقق من الشبكة وحاول مرة أخرى.",
         submitting: "<i class='fa-solid fa-spinner fa-spin'></i> جاري إرسال الطلب...",
         
         govCairo: "القاهرة",
@@ -82,6 +84,8 @@ const translations = {
         successHomeBtn: "<i class='fa-solid fa-house'></i> Back to Home",
         cartEmptyAlert: "Your shopping cart is empty! Cannot proceed to checkout.",
         orderSubmitError: "An error occurred while placing your order. Please try again.",
+        networkError: "Sorry, a server connection error occurred. Please try again.",
+        requestTimeout: "The request timed out. Check your connection and try again.",
         submitting: "<i class='fa-solid fa-spinner fa-spin'></i> Placing order...",
         
         govCairo: "Cairo",
@@ -131,6 +135,10 @@ const GOV_LABEL_KEYS = {
 
 let submitBtnOriginalHtml = "";
 let isSubmittingOrder = false;
+let orderSubmitSucceeded = false;
+
+/** مهلة طلب Supabase (مللي ثانية) */
+const CHECKOUT_REQUEST_TIMEOUT_MS = 45000;
 
 document.addEventListener("DOMContentLoaded", async () => {
     if (cart.length === 0) {
@@ -331,15 +339,135 @@ function getCheckoutClient() {
     return client;
 }
 
+/** هل الخطأ من نوع FetchError (فشل الشبكة / CORS / السيرفر لا يرد) */
+function isFetchError(err) {
+    if (!err) return false;
+    const name = err.name || err.constructor?.name || "";
+    if (name === "FetchError") return true;
+    const str = String(err.message || err);
+    return str.includes("FetchError") || str.includes("Failed to fetch");
+}
+
+/** توحيد الأخطاء — Supabase أحياناً يرمي Object وليس Error */
+function normalizeCheckoutError(err) {
+    const t = translations[currentLang];
+
+    if (!err) {
+        return new Error(t.orderSubmitError);
+    }
+
+    if (isFetchError(err)) {
+        return new Error(t.networkError);
+    }
+
+    if (err instanceof Error && err.message) {
+        return err;
+    }
+
+    const name = err.name || "SupabaseError";
+    const msg = String(
+        err.message || err.msg || err.error_description || err.details || err.hint || ""
+    ).trim();
+    const status = err.status || err.statusCode || err.httpStatus;
+
+    if (status && Number(status) >= 400) {
+        const httpErr = new Error(msg || `${t.orderSubmitError} (HTTP ${status})`);
+        httpErr.status = status;
+        httpErr.code = err.code;
+        return httpErr;
+    }
+
+    if (typeof err === "object") {
+        const wrapped = new Error(msg || JSON.stringify(err));
+        wrapped.name = name;
+        wrapped.code = err.code;
+        wrapped.status = status;
+        wrapped.details = err.details;
+        return wrapped;
+    }
+
+    return new Error(String(err));
+}
+
+/**
+ * تنفيذ طلب Supabase مع مهلة — أي رد فيه error أو HTTP غير ناجح يُرمى كـ Exception
+ */
+async function runCheckoutRequest(label, requestFn) {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            const t = translations[currentLang];
+            reject(new Error(t.requestTimeout));
+        }, CHECKOUT_REQUEST_TIMEOUT_MS);
+    });
+
+    try {
+        const result = await Promise.race([requestFn(), timeoutPromise]);
+        clearTimeout(timeoutId);
+
+        if (result && typeof result === "object" && "error" in result && result.error) {
+            throw normalizeCheckoutError(result.error);
+        }
+
+        return result;
+    } catch (err) {
+        clearTimeout(timeoutId);
+        const normalized = normalizeCheckoutError(err);
+        normalized.checkoutStep = label;
+        throw normalized;
+    }
+}
+
+/** إعادة زر الإرسال لحالته الطبيعية */
+function resetSubmitButton() {
+    isSubmittingOrder = false;
+    setSubmitLoading(false);
+}
+
+/** معالجة الفشل: console + تنبيه + إعادة الزر */
+function handleCheckoutFailure(err, context) {
+    const normalized = normalizeCheckoutError(err);
+    const friendly = parseCheckoutError(normalized);
+
+    console.error(`[Checkout] فشل (${context || "submit"}):`, normalized);
+    console.error("[Checkout] تفاصيل الخطأ:", {
+        name: normalized.name,
+        message: normalized.message,
+        code: normalized.code,
+        status: normalized.status,
+        step: normalized.checkoutStep,
+        raw: err,
+    });
+
+    showCheckoutMessage(friendly, "error");
+    alert(friendly);
+    resetSubmitButton();
+}
+
 /** تحويل أخطاء Supabase / الشبكة إلى رسالة مفهومة للمستخدم */
 function parseCheckoutError(err) {
     const t = translations[currentLang];
-    if (!err) return t.orderSubmitError;
+    const normalized = normalizeCheckoutError(err);
 
-    const code = err.code || err.error_code || "";
-    const msg = String(err.message || err.msg || err.error_description || "").trim();
-    const details = String(err.details || err.hint || "").trim();
+    if (isFetchError(normalized) || isFetchError(err)) {
+        return t.networkError;
+    }
+
+    if (normalized.message === t.requestTimeout) {
+        return t.requestTimeout;
+    }
+
+    const code = normalized.code || err?.code || err?.error_code || "";
+    const msg = String(normalized.message || "").trim();
+    const details = String(normalized.details || err?.details || err?.hint || "").trim();
+    const status = normalized.status || err?.status;
     const combined = `${msg} ${details}`.toLowerCase();
+
+    if (status && Number(status) >= 400) {
+        return currentLang === "ar"
+            ? `رفض السيرفر الطلب (${status}). ${msg || t.orderSubmitError}`
+            : `Server rejected the request (${status}). ${msg || t.orderSubmitError}`;
+    }
 
     const mapAr = {
         invalid_customer_name: "يرجى إدخال اسم العميل (حرفان على الأقل).",
@@ -347,11 +475,14 @@ function parseCheckoutError(err) {
         invalid_governorate: "يرجى اختيار المحافظة.",
         invalid_address: "يرجى إدخال العنوان بالتفصيل.",
         empty_cart: "السلة فارغة. أضف كتباً قبل إتمام الشراء.",
+        book_unavailable: "أحد الكتب في السلة لم يعد متوفراً. حدّث السلة وحاول مرة أخرى.",
         "42501": "صلاحيات قاعدة البيانات تمنع إتمام الطلب. شغّل supabase/checkout-fix.sql في SQL Editor.",
         "23503": "أحد الكتب في السلة لم يعد متوفراً. حدّث السلة وحاول مرة أخرى.",
         "23505": "طلب مكرر. حاول مرة أخرى بعد لحظات.",
         PGRST301: "انتهت الجلسة أو مفتاح API غير صالح.",
-        "Failed to fetch": "تعذر الاتصال بالإنترنت. تحقق من الشبكة وحاول مجدداً.",
+        "Failed to fetch": t.networkError,
+        fetcherror: t.networkError,
+        request_timeout: t.requestTimeout,
         "No data returned": "لم يُرجع السيرفر رقم الطلب. شغّل سكربت checkout-fix.sql.",
     };
 
@@ -482,20 +613,20 @@ function buildOrderPayload(formData, session) {
 
 /** الطريقة المفضلة: RPC آمن (يتجاوز مشكلة RLS على SELECT بعد INSERT للضيف) */
 async function placeOrderViaRpc(supabase, payload) {
-    const { data, error } = await supabase.rpc("place_order", {
-        p_customer_name: payload.customer_name,
-        p_customer_phone: payload.customer_phone,
-        p_customer_email: payload.customer_email,
-        p_governorate: payload.governorate,
-        p_address: payload.address,
-        p_notes: payload.notes || "",
-        p_total_price: payload.total_price,
-        p_shipping_cost: payload.shipping_cost,
-        p_user_id: payload.user_id,
-        p_items: payload.items,
-    });
-
-    if (error) throw error;
+    const { data } = await runCheckoutRequest("place_order RPC", () =>
+        supabase.rpc("place_order", {
+            p_customer_name: payload.customer_name,
+            p_customer_phone: payload.customer_phone,
+            p_customer_email: payload.customer_email,
+            p_governorate: payload.governorate,
+            p_address: payload.address,
+            p_notes: payload.notes || "",
+            p_total_price: payload.total_price,
+            p_shipping_cost: payload.shipping_cost,
+            p_user_id: payload.user_id,
+            p_items: payload.items,
+        })
+    );
 
     const orderId = data?.order_id || data?.orderId;
     if (!orderId) {
@@ -504,27 +635,29 @@ async function placeOrderViaRpc(supabase, payload) {
     return String(orderId);
 }
 
-/** احتياطي: إدراج مباشر (قد يفشل SELECT للضيف بدون checkout-fix.sql) */
+/** احتياطي: إدراج مباشر (قد يفشل SELECT للضيف بدون backend-fix.sql) */
 async function placeOrderDirect(supabase, payload) {
-    const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .insert([
-            {
-                user_id: payload.user_id,
-                customer_name: payload.customer_name,
-                customer_phone: payload.customer_phone,
-                customer_email: payload.customer_email,
-                governorate: payload.governorate,
-                address: payload.address,
-                notes: payload.notes,
-                total_price: payload.total_price,
-                shipping_cost: payload.shipping_cost,
-                status: payload.status,
-            },
-        ])
-        .select("id");
+    const orderResult = await runCheckoutRequest("insert order", () =>
+        supabase
+            .from("orders")
+            .insert([
+                {
+                    user_id: payload.user_id,
+                    customer_name: payload.customer_name,
+                    customer_phone: payload.customer_phone,
+                    customer_email: payload.customer_email,
+                    governorate: payload.governorate,
+                    address: payload.address,
+                    notes: payload.notes,
+                    total_price: payload.total_price,
+                    shipping_cost: payload.shipping_cost,
+                    status: payload.status,
+                },
+            ])
+            .select("id")
+    );
 
-    if (orderError) throw orderError;
+    const orderData = orderResult.data;
     if (!orderData?.length) {
         throw new Error("No data returned from order insertion.");
     }
@@ -537,8 +670,9 @@ async function placeOrderDirect(supabase, payload) {
         price: item.price,
     }));
 
-    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-    if (itemsError) throw itemsError;
+    await runCheckoutRequest("insert order_items", () =>
+        supabase.from("order_items").insert(orderItems)
+    );
 
     return String(orderId);
 }
@@ -549,16 +683,17 @@ async function createOrder(payload) {
     try {
         return await placeOrderViaRpc(supabase, payload);
     } catch (rpcErr) {
-        const rpcMsg = String(rpcErr?.message || rpcErr?.code || "").toLowerCase();
+        const normalized = normalizeCheckoutError(rpcErr);
+        const rpcMsg = String(normalized.message || normalized.code || "").toLowerCase();
         const rpcMissing =
             rpcMsg.includes("place_order") ||
             rpcMsg.includes("function") ||
             rpcMsg.includes("does not exist") ||
-            rpcErr?.code === "42883";
+            normalized.code === "42883";
 
-        if (!rpcMissing) throw rpcErr;
+        if (!rpcMissing) throw normalized;
 
-        console.warn("place_order RPC unavailable, using direct insert:", rpcErr);
+        console.warn("[Checkout] place_order RPC غير متاح، محاولة الإدراج المباشر:", normalized);
         return await placeOrderDirect(supabase, payload);
     }
 }
@@ -579,11 +714,13 @@ function showCheckoutSuccess(orderId) {
     }, 1800);
 }
 
-/** تنفيذ إرسال الطلب — مع try/catch/finally كامل */
+/** تنفيذ إرسال الطلب — try/catch/finally + إعادة الزر عند أي فشل */
 async function submitOrder() {
     if (isSubmittingOrder) return;
 
+    orderSubmitSucceeded = false;
     showCheckoutMessage("");
+
     const validation = validateCheckoutForm();
     if (!validation.ok) {
         showCheckoutMessage(validation.message, "error");
@@ -595,40 +732,58 @@ async function submitOrder() {
 
     try {
         const supabase = getCheckoutClient();
-        const {
-            data: { session },
-        } = await supabase.auth.getSession();
+
+        const sessionResult = await runCheckoutRequest("auth.getSession", () =>
+            supabase.auth.getSession()
+        );
+        const session = sessionResult?.data?.session || null;
 
         const payload = buildOrderPayload(validation.data, session);
         const orderId = await createOrder(payload);
 
         localStorage.removeItem("cart");
         cart = [];
+        orderSubmitSucceeded = true;
         showCheckoutSuccess(orderId);
     } catch (err) {
-        console.error("Order submission failure:", err);
-        const friendly = parseCheckoutError(err);
-        showCheckoutMessage(friendly, "error");
+        handleCheckoutFailure(err, "submitOrder");
     } finally {
-        isSubmittingOrder = false;
-        setSubmitLoading(false);
+        if (!orderSubmitSucceeded) {
+            resetSubmitButton();
+        }
     }
 }
 
 /**
- * غلاف النموذج — يمنع Uncaught (in promise) من onsubmit مع دالة async
+ * غلاف النموذج — يمنع Uncaught (in promise) عند استخدام async مع onsubmit
  */
-function handleCheckoutSubmit(e) {
+async function handleCheckoutSubmit(e) {
     e.preventDefault();
-    submitOrder().catch((err) => {
-        console.error("Unhandled checkout rejection:", err);
-        const friendly = parseCheckoutError(err);
-        showCheckoutMessage(friendly, "error");
-        isSubmittingOrder = false;
-        setSubmitLoading(false);
-    });
+    e.stopPropagation();
+
+    try {
+        await submitOrder();
+    } catch (err) {
+        handleCheckoutFailure(err, "handleCheckoutSubmit");
+    }
+
     return false;
 }
 
+/** شبكة أمان: أي Promise مرفوض على صفحة الدفع يُعالج ولا يعلق الزر */
+window.addEventListener("unhandledrejection", (event) => {
+    if (!/\/checkout\.html$/i.test(location.pathname)) return;
+
+    const btn = document.getElementById("btnPlaceOrder");
+    const stillLoading = isSubmittingOrder || btn?.disabled;
+
+    if (!stillLoading) return;
+
+    console.error("[Checkout] unhandledrejection:", event.reason);
+    event.preventDefault();
+    handleCheckoutFailure(event.reason, "unhandledrejection");
+});
+
 window.handleCheckoutSubmit = handleCheckoutSubmit;
 window.submitOrder = submitOrder;
+window.resetSubmitButton = resetSubmitButton;

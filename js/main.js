@@ -353,55 +353,45 @@ function showBooksLoadError(message) {
     </div>`;
 }
 
-// Fetch books — cache first, then network (stale-while-revalidate)
 async function loadBooksFromDB(forceRefresh = false) {
     const grid = document.getElementById("booksGrid");
-    if (!grid || !window.dmBooks) {
-        const msg = "تعذر تهيئة التطبيق. حدّث الصفحة.";
-        showBooksLoadError(msg);
-        showCatalogBanner(msg, "error");
-        return;
-    }
+    if (!grid || !window.dmBooks) return;
+
+    // 1. قراءة وقت آخر تحديث
+    const cacheTimestamp = localStorage.getItem("dm_books_cache_time");
+    const now = Date.now();
+    const CACHE_TTL = 3600000; // ساعة واحدة (ممكن تغيرها براحتك)
+
+    // 2. تحديد هل نحتاج نجيب من السيرفر؟
+    const isExpired = !cacheTimestamp || (now - parseInt(cacheTimestamp) > CACHE_TTL);
+    const shouldFetch = forceRefresh || isExpired;
 
     booksLoading = true;
     showCatalogBanner("");
-    if (!booksReady && !forceRefresh) showBooksSkeleton(SKELETON_COUNT);
+    
+    // إظهار الهيكل لو مش جاهز
+    if (!booksReady) showBooksSkeleton(SKELETON_COUNT);
 
     try {
-        const { data } = await window.dmBooks.fetchBooksList({ force: forceRefresh });
+        const { data } = await window.dmBooks.fetchBooksList({ force: shouldFetch });
         allBooks = data || [];
         booksReady = true;
+        
+        // 3. لو جبنا داتا جديدة، نحدث وقت الكاش
+        if (shouldFetch) {
+            localStorage.setItem("dm_books_cache_time", Date.now().toString());
+        }
+        
         renderBooksGrid();
         window.dmHeroBooks?.updateHeroFromBooks(allBooks);
     } catch (err) {
-        const normalized = window.dmApiGuard?.normalizeError
-            ? window.dmApiGuard.normalizeError(err)
-            : err;
+        const normalized = window.dmApiGuard?.normalizeError ? window.dmApiGuard.normalizeError(err) : err;
         console.error("[index] Error loading books:", normalized);
-        const msg =
-            normalized.message ||
-            (currentLang === "ar"
-                ? "حدث خطأ أثناء تحميل الكتب. تحقق من الاتصال وحاول مرة أخرى."
-                : "Failed to load books. Check your connection and retry.");
+        const msg = normalized.message || "حدث خطأ أثناء تحميل الكتب.";
         showCatalogBanner(msg, "error");
         if (!allBooks.length) showBooksLoadError(msg);
     } finally {
         booksLoading = false;
-    }
-}
-
-window.loadBooksFromDB = loadBooksFromDB;
-
-// Filter and Sort Books
-function filterBooks() {
-    renderBooksGrid();
-}
-
-function selectCategory(cat) {
-    const filter = document.getElementById("categoryFilter");
-    if (filter) {
-        filter.value = cat;
-        filterBooks();
     }
 }
 

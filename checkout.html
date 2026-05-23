@@ -62,21 +62,22 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="governorate" id="lblGovernorate">المحافظة *</label>
-                                <select id="governorate" required onchange="calculateShipping()">
+                                <select id="governorate" required onchange="onGovernorateChange()">
                                     <option value="" disabled selected id="optSelectGov">اختر المحافظة</option>
-                                    <option value="cairo">القاهرة</option>
-                                    <option value="giza">الجيزة</option>
-                                    <option value="alexandria">الإسكندرية</option>
-                                    <option value="delta">الدلتا والقناة (طنطا، المنصورة، السويس...)</option>
-                                    <option value="upper">الصعيد (المنيا، أسيوط، سوهاج...)</option>
-                                    <option value="remote">المناطق النائية (البحر الأحمر، مطروح...)</option>
                                 </select>
                             </div>
                             
                             <div class="form-group">
-                                <label for="address" id="lblAddress">العنوان بالتفصيل *</label>
-                                <input type="text" id="address" required placeholder="الشارع، رقم المبنى، الدور، الشقة">
+                                <label for="city" id="lblCity">المدينة / المركز / الإدارة *</label>
+                                <select id="city" required onchange="calculateShipping()">
+                                    <option value="" disabled selected id="optSelectCity">اختر المدينة أو المركز</option>
+                                </select>
                             </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="address" id="lblAddress">العنوان بالتفصيل (شارع، مبنى، دور، شقة) *</label>
+                            <input type="text" id="address" required placeholder="مثال: شارع النيل، عمارة 5، الدور 3، شقة 12">
                         </div>
                         
                         <div class="form-group">

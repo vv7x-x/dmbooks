@@ -12,6 +12,7 @@ const translations = {
         sidebarTitle: "لوحة التحكم dm",
         btnTabOrdersText: "الطلبات الواردة",
         btnTabBooksText: "إدارة الكتب",
+        btnTabGovText: "المحافظات والشحن",
         btnAdminLogoutText: "تسجيل الخروج",
         ordersPaneTitle: "الطلبات الواردة",
         ordersCount: "العدد الإجمالي: ",
@@ -22,6 +23,31 @@ const translations = {
         thTotal: "الإجمالي",
         thStatus: "الحالة",
         thActions: "إجراءات",
+        govPaneTitle: "إدارة المحافظات وأسعار الشحن",
+        govCount: "عدد المحافظات: ",
+        btnAddGovText: "إضافة محافظة",
+        addGovModalTitle: "إضافة محافظة جديدة",
+        lblGovNameAr: "اسم المحافظة (عربي) *",
+        lblGovNameEn: "اسم المحافظة (English) *",
+        lblGovShipping: "سعر التوصيل (ج.م) *",
+        btnCancelGov: "إلغاء",
+        btnSubmitGov: "حفظ",
+        thGovName: "المحافظة",
+        thGovShipping: "سعر التوصيل (ج.م)",
+        thGovCities: "عدد المدن",
+        thGovActions: "إجراءات",
+        citySectionTitle: "مدن ومراكز ",
+        btnAddCityText: "إضافة مدينة",
+        addCityModalTitle: "إضافة مدينة / مركز",
+        lblCityNameAr: "الاسم (عربي) *",
+        lblCityNameEn: "الاسم (English) *",
+        btnCancelCity: "إلغاء",
+        btnSubmitCity: "حفظ",
+        thCityName: "المدينة / المركز",
+        thCityActions: "حذف",
+        govDeleteConfirm: "هل أنت متأكد من حذف هذه المحافظة وجميع مدنها؟",
+        cityDeleteConfirm: "هل أنت متأكد من حذف هذه المدينة؟",
+        govShippingUpdated: "تم تحديث سعر التوصيل بنجاح",
         booksPaneTitle: "إدارة الكتب",
         btnAddBookBtn: "إضافة كتاب جديد",
         thBookCover: "الغلاف",
@@ -111,6 +137,7 @@ const translations = {
         sidebarTitle: "dm Control Panel",
         btnTabOrdersText: "Incoming Orders",
         btnTabBooksText: "Manage Books",
+        btnTabGovText: "Governorates & Shipping",
         btnAdminLogoutText: "Logout",
         ordersPaneTitle: "Incoming Orders",
         ordersCount: "Total Orders: ",
@@ -121,6 +148,31 @@ const translations = {
         thTotal: "Total",
         thStatus: "Status",
         thActions: "Actions",
+        govPaneTitle: "Governorates & Shipping Management",
+        govCount: "Governorates: ",
+        btnAddGovText: "Add Governorate",
+        addGovModalTitle: "Add New Governorate",
+        lblGovNameAr: "Name (Arabic) *",
+        lblGovNameEn: "Name (English) *",
+        lblGovShipping: "Shipping Cost (EGP) *",
+        btnCancelGov: "Cancel",
+        btnSubmitGov: "Save",
+        thGovName: "Governorate",
+        thGovShipping: "Shipping Cost (EGP)",
+        thGovCities: "Cities Count",
+        thGovActions: "Actions",
+        citySectionTitle: "Cities & Districts of ",
+        btnAddCityText: "Add City",
+        addCityModalTitle: "Add City / District",
+        lblCityNameAr: "Name (Arabic) *",
+        lblCityNameEn: "Name (English) *",
+        btnCancelCity: "Cancel",
+        btnSubmitCity: "Save",
+        thCityName: "City / District",
+        thCityActions: "Delete",
+        govDeleteConfirm: "Are you sure you want to delete this governorate and all its cities?",
+        cityDeleteConfirm: "Are you sure you want to delete this city?",
+        govShippingUpdated: "Shipping cost updated successfully",
         booksPaneTitle: "Books Management",
         btnAddBookBtn: "Add New Book",
         thBookCover: "Cover",
@@ -204,6 +256,9 @@ let currentLang = localStorage.getItem("lang") || "ar";
 let activeTab = "orders";
 let currentOrders = [];
 let currentBooks = [];
+let currentGovernorates = [];
+let currentCities = [];
+let selectedGovId = null;
 let selectedOrderId = null;
 let preparedCoverBlob = null;
 let preparedCoverPreviewUrl = null;
@@ -313,6 +368,7 @@ function applyLanguage(lang) {
     safeSetText("sidebarTitle", t.sidebarTitle);
     safeSetText("btnTabOrdersText", t.btnTabOrdersText);
     safeSetText("btnTabBooksText", t.btnTabBooksText);
+    safeSetText("btnTabGovText", t.btnTabGovText);
     safeSetText("btnAdminLogoutText", t.btnAdminLogoutText);
     
     safeSetText("ordersPaneTitle", t.ordersPaneTitle);
@@ -323,6 +379,28 @@ function applyLanguage(lang) {
     safeSetText("thTotal", t.thTotal);
     safeSetText("thStatus", t.thStatus);
     safeSetText("thActions", t.thActions);
+    
+    safeSetText("govPaneTitle", t.govPaneTitle);
+    safeSetText("btnAddGovText", t.btnAddGovText);
+    safeSetText("addGovModalTitle", t.addGovModalTitle);
+    safeSetText("lblGovNameAr", t.lblGovNameAr);
+    safeSetText("lblGovNameEn", t.lblGovNameEn);
+    safeSetText("lblGovShipping", t.lblGovShipping);
+    safeSetText("btnCancelGov", t.btnCancelGov);
+    safeSetText("btnSubmitGov", t.btnSubmitGov);
+    safeSetText("thGovName", t.thGovName);
+    safeSetText("thGovShipping", t.thGovShipping);
+    safeSetText("thGovCities", t.thGovCities);
+    safeSetText("thGovActions", t.thGovActions);
+    safeSetText("citySectionTitle", t.citySectionTitle);
+    safeSetText("btnAddCityText", t.btnAddCityText);
+    safeSetText("addCityModalTitle", t.addCityModalTitle);
+    safeSetText("lblCityNameAr", t.lblCityNameAr);
+    safeSetText("lblCityNameEn", t.lblCityNameEn);
+    safeSetText("btnCancelCity", t.btnCancelCity);
+    safeSetText("btnSubmitCity", t.btnSubmitCity);
+    safeSetText("thCityName", t.thCityName);
+    safeSetText("thCityActions", t.thCityActions);
     
     safeSetText("booksPaneTitle", t.booksPaneTitle);
     safeSetText("btnAddBookBtn", t.btnAddBookBtn);
@@ -539,11 +617,14 @@ function switchTab(tab) {
     activeTab = tab;
     document.getElementById("tabBtnOrders").classList.toggle("active", tab === "orders");
     document.getElementById("tabBtnBooks").classList.toggle("active", tab === "books");
+    document.getElementById("tabBtnGovernorates").classList.toggle("active", tab === "governorates");
     document.getElementById("paneOrders").style.display = tab === "orders" ? "block" : "none";
     document.getElementById("paneBooks").style.display = tab === "books" ? "block" : "none";
+    document.getElementById("paneGovernorates").style.display = tab === "governorates" ? "block" : "none";
     
     if (tab === "orders") loadOrders();
-    else loadBooks();
+    else if (tab === "books") loadBooks();
+    else if (tab === "governorates") loadGovernorates();
 }
 
 // ---------------------------
@@ -683,6 +764,297 @@ function exportOrdersToCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// ---------------------------
+// قسم المحافظات والمدن والشحن
+// ---------------------------
+
+async function loadGovernorates() {
+    const tbody = document.getElementById("governoratesTableBody");
+    const t = translations[currentLang];
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">${t.loading}</td></tr>`;
+    showAdminDashboardAlert("");
+
+    try {
+        const { data } = await adminRun("admin.governorates.list", () =>
+            getSb().from("governorates").select("*").order("sort_order", { ascending: true })
+        );
+        currentGovernorates = data || [];
+        renderGovernorates();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] loadGovernorates:", normalized);
+        const msg =
+            normalized.message ||
+            (currentLang === "ar" ? "خطأ في تحميل المحافظات." : "Failed to load governorates.");
+        showAdminDashboardAlert(msg, "error");
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger);">${msg}</td></tr>`;
+    }
+}
+
+function renderGovernorates() {
+    const tbody = document.getElementById("governoratesTableBody");
+    const countEl = document.getElementById("govCount");
+    const t = translations[currentLang];
+    if (!tbody) return;
+
+    countEl.innerText = `${t.govCount}${currentGovernorates.length}`;
+
+    if (currentGovernorates.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:20px;">${t.noSearchResults}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = currentGovernorates.map(gov => {
+        const cityCount = currentCities.filter(c => c.governorate_id === gov.id).length;
+        const isSelected = selectedGovId === gov.id;
+        return `
+        <tr class="${isSelected ? 'row-selected' : ''}" style="cursor:pointer;">
+            <td style="font-weight:700;" onclick="selectGovernorate('${gov.id}')">${currentLang === "ar" ? gov.name_ar : gov.name_en}</td>
+            <td>
+                <input type="number" step="0.01" min="0" value="${gov.shipping_cost}" 
+                       style="width:100px; padding:4px 8px; border:1px solid rgba(197,150,58,0.3); border-radius:6px; background:transparent;"
+                       onchange="updateShippingCost('${gov.id}', this.value)">
+            </td>
+            <td onclick="selectGovernorate('${gov.id}')">${cityCount}</td>
+            <td>
+                <button class="action-btn" style="color:var(--danger); border:none; background:transparent; cursor:pointer;" onclick="deleteGovernorate('${gov.id}')">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+async function selectGovernorate(govId) {
+    selectedGovId = govId;
+    renderGovernorates();
+
+    const gov = currentGovernorates.find(g => g.id === govId);
+    if (!gov) return;
+
+    document.getElementById("selectedGovName").innerText = currentLang === "ar" ? gov.name_ar : gov.name_en;
+    document.getElementById("citySection").style.display = "block";
+    await loadCities(govId);
+}
+
+async function loadCities(govId) {
+    const tbody = document.getElementById("citiesTableBody");
+    const t = translations[currentLang];
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">${t.loading}</td></tr>`;
+
+    try {
+        const { data } = await adminRun("admin.cities.list", () =>
+            getSb().from("cities").select("*").eq("governorate_id", govId).order("sort_order", { ascending: true })
+        );
+        currentCities = data || [];
+        renderGovernorates();
+        renderCities();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] loadCities:", normalized);
+        tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--danger);">${normalized.message || "Error"}</td></tr>`;
+    }
+}
+
+function renderCities() {
+    const tbody = document.getElementById("citiesTableBody");
+    const t = translations[currentLang];
+    if (!tbody) return;
+
+    if (currentCities.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:var(--ink-muted);">${currentLang === "ar" ? "لا توجد مدن مضافة بعد." : "No cities added yet."}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = currentCities.map(city => `
+        <tr>
+            <td>${currentLang === "ar" ? city.name_ar : city.name_en}</td>
+            <td>
+                <button class="action-btn" style="color:var(--danger); border:none; background:transparent; cursor:pointer;" onclick="deleteCity('${city.id}')">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+async function updateShippingCost(govId, cost) {
+    const t = translations[currentLang];
+    const newCost = parseFloat(cost);
+    if (isNaN(newCost) || newCost < 0) return;
+
+    try {
+        await adminRun("admin.governorates.shipping", () =>
+            getSb().from("governorates").update({ shipping_cost: newCost }).eq("id", govId)
+        );
+        const gov = currentGovernorates.find(g => g.id === govId);
+        if (gov) gov.shipping_cost = newCost;
+        showAdminDashboardAlert(t.govShippingUpdated, "success");
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] updateShippingCost:", normalized);
+        showAdminDashboardAlert(normalized.message || "Error", "error");
+    }
+}
+
+async function deleteGovernorate(govId) {
+    const t = translations[currentLang];
+    if (!confirm(t.govDeleteConfirm)) return;
+
+    try {
+        await adminRun("admin.governorates.delete", () =>
+            getSb().from("governorates").delete().eq("id", govId)
+        );
+        currentGovernorates = currentGovernorates.filter(g => g.id !== govId);
+        if (selectedGovId === govId) {
+            selectedGovId = null;
+            document.getElementById("citySection").style.display = "none";
+            currentCities = [];
+        }
+        renderGovernorates();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] deleteGovernorate:", normalized);
+        alert(normalized.message || "Error");
+    }
+}
+
+async function deleteCity(cityId) {
+    const t = translations[currentLang];
+    if (!confirm(t.cityDeleteConfirm)) return;
+
+    try {
+        await adminRun("admin.cities.delete", () =>
+            getSb().from("cities").delete().eq("id", cityId)
+        );
+        currentCities = currentCities.filter(c => c.id !== cityId);
+        renderCities();
+        if (selectedGovId) renderGovernorates();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] deleteCity:", normalized);
+        alert(normalized.message || "Error");
+    }
+}
+
+function openAddGovernorateModal() {
+    document.getElementById("addGovernorateModal").classList.add("open");
+}
+
+function closeAddGovernorateModal() {
+    document.getElementById("addGovernorateModal").classList.remove("open");
+    document.getElementById("addGovernorateForm").reset();
+}
+
+async function submitGovernorate(e) {
+    e.preventDefault();
+    const t = translations[currentLang];
+    const saveBtn = document.getElementById("btnSubmitGov");
+    const originalBtn = saveBtn.innerHTML;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = t.saving;
+
+    const nameAr = document.getElementById("govNameArInput").value.trim();
+    const nameEn = document.getElementById("govNameEnInput").value.trim();
+    const shippingCost = parseFloat(document.getElementById("govShippingInput").value);
+
+    try {
+        const { data } = await adminRun("admin.governorates.insert", () =>
+            getSb().from("governorates").insert([{
+                name_ar: nameAr,
+                name_en: nameEn,
+                shipping_cost: shippingCost,
+                sort_order: currentGovernorates.length + 1
+            }]).select().single()
+        );
+
+        if (data) {
+            currentGovernorates.push(data);
+            renderGovernorates();
+        }
+
+        closeAddGovernorateModal();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] submitGovernorate:", normalized);
+        showAdminDashboardAlert(normalized.message || "Error", "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+    }
+}
+
+function openAddCityModal() {
+    if (!selectedGovId) {
+        alert(currentLang === "ar" ? "يرجى اختيار محافظة أولاً." : "Please select a governorate first.");
+        return;
+    }
+    document.getElementById("addCityModal").classList.add("open");
+}
+
+function closeAddCityModal() {
+    document.getElementById("addCityModal").classList.remove("open");
+    document.getElementById("addCityForm").reset();
+}
+
+async function submitCity(e) {
+    e.preventDefault();
+    const t = translations[currentLang];
+    const saveBtn = document.getElementById("btnSubmitCity");
+    const originalBtn = saveBtn.innerHTML;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = t.saving;
+
+    const nameAr = document.getElementById("cityNameArInput").value.trim();
+    const nameEn = document.getElementById("cityNameEnInput").value.trim();
+
+    try {
+        const { data } = await adminRun("admin.cities.insert", () =>
+            getSb().from("cities").insert([{
+                governorate_id: selectedGovId,
+                name_ar: nameAr,
+                name_en: nameEn,
+                sort_order: currentCities.length + 1
+            }]).select().single()
+        );
+
+        if (data) {
+            currentCities.push(data);
+            renderCities();
+            renderGovernorates();
+        }
+
+        closeAddCityModal();
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError
+            ? window.dmApiGuard.normalizeError(err)
+            : err;
+        console.error("[admin] submitCity:", normalized);
+        showAdminDashboardAlert(normalized.message || "Error", "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+    }
 }
 
 // ---------------------------

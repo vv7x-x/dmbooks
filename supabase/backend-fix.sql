@@ -30,6 +30,10 @@ $$;
 
 -- ─── 2. إتمام الطلب (Checkout) — تجاوز RLS للضيف ───────────────
 
+-- حذف الدوال القديمة لتجنب تعارض التحميل (overload ambiguity)
+DROP FUNCTION IF EXISTS public.place_order(text, text, text, text, text, text, numeric, numeric, uuid, jsonb);
+DROP FUNCTION IF EXISTS public.place_order(text, text, text, text, text, text, numeric, numeric, uuid, jsonb, text);
+
 CREATE OR REPLACE FUNCTION public.place_order(
   p_customer_name text,
   p_customer_phone text,
@@ -40,7 +44,8 @@ CREATE OR REPLACE FUNCTION public.place_order(
   p_total_price numeric,
   p_shipping_cost numeric,
   p_user_id uuid DEFAULT NULL,
-  p_items jsonb DEFAULT '[]'::jsonb
+  p_items jsonb DEFAULT '[]'::jsonb,
+  p_city text DEFAULT ''
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -76,13 +81,14 @@ BEGIN
 
   INSERT INTO public.orders (
     user_id, customer_name, customer_phone, customer_email,
-    governorate, address, notes, total_price, shipping_cost, status
+    governorate, city, address, notes, total_price, shipping_cost, status
   ) VALUES (
     p_user_id,
     trim(p_customer_name),
     trim(p_customer_phone),
     nullif(trim(COALESCE(p_customer_email, '')), ''),
     trim(p_governorate),
+    nullif(trim(COALESCE(p_city, '')), ''),
     trim(p_address),
     nullif(trim(COALESCE(p_notes, '')), ''),
     COALESCE(p_total_price, 0),

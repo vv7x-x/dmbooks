@@ -796,6 +796,11 @@ TABLE
     rgba(197,150,58,.04);
 }
 
+.admin-table tbody tr.row-selected{
+    background:rgba(197,150,58,.1);
+    border-left:3px solid var(--gold);
+}
+
 .admin-table-img{
 
     width:58px;

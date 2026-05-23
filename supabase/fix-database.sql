@@ -69,8 +69,33 @@ CREATE TABLE IF NOT EXISTS public.contact_messages (
 -- أعمدة إضافية إن وُجدت الجداول قديماً
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_email text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS city text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- ─── جداول المحافظات والمدن ───────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.governorates (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  name_ar text NOT NULL,
+  name_en text NOT NULL,
+  shipping_cost numeric NOT NULL DEFAULT 0,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.cities (
+  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  governorate_id uuid NOT NULL REFERENCES public.governorates(id) ON DELETE CASCADE,
+  name_ar text NOT NULL,
+  name_en text NOT NULL,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cities_governorate_id ON public.cities(governorate_id);
+CREATE INDEX IF NOT EXISTS idx_governorates_sort ON public.governorates(sort_order);
+CREATE INDEX IF NOT EXISTS idx_cities_sort ON public.cities(sort_order);
 
 -- ─── 2. الدوال والمحفزات ─────────────────────────────────────
 
@@ -181,6 +206,8 @@ ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.governorates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 
 -- حذف السياسات القديمة
 DO $$
@@ -190,7 +217,7 @@ BEGIN
     SELECT policyname, tablename
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename IN ('books','orders','order_items','admin_users','profiles','contact_messages')
+      AND tablename IN ('books','orders','order_items','admin_users','profiles','contact_messages','governorates','cities')
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
   END LOOP;
@@ -278,6 +305,32 @@ CREATE POLICY admin_users_self_check ON public.admin_users
 CREATE POLICY admin_users_admin_select ON public.admin_users
   FOR SELECT USING (public.is_admin());
 
+-- المحافظات: قراءة للجميع، إدارة للأدمن
+CREATE POLICY gov_public_select ON public.governorates
+  FOR SELECT USING (true);
+
+CREATE POLICY gov_admin_insert ON public.governorates
+  FOR INSERT WITH CHECK (public.is_admin());
+
+CREATE POLICY gov_admin_update ON public.governorates
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+CREATE POLICY gov_admin_delete ON public.governorates
+  FOR DELETE USING (public.is_admin());
+
+-- المدن: قراءة للجميع، إدارة للأدمن
+CREATE POLICY cities_public_select ON public.cities
+  FOR SELECT USING (true);
+
+CREATE POLICY cities_admin_insert ON public.cities
+  FOR INSERT WITH CHECK (public.is_admin());
+
+CREATE POLICY cities_admin_update ON public.cities
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+CREATE POLICY cities_admin_delete ON public.cities
+  FOR DELETE USING (public.is_admin());
+
 -- ─── 5. بيانات تجريبية (كتب) — تُدرج فقط إن كان الجدول فارغاً ───
 
 INSERT INTO public.books (title, author, price, category, language, description, in_stock)
@@ -292,6 +345,10 @@ WHERE NOT EXISTS (SELECT 1 FROM public.books LIMIT 1);
 
 -- ─── 6. دالة إتمام الطلب (Checkout) ────────────────────────────
 
+-- حذف الدوال القديمة لتجنب تعارض التحميل (overload ambiguity)
+DROP FUNCTION IF EXISTS public.place_order(text, text, text, text, text, text, numeric, numeric, uuid, jsonb);
+DROP FUNCTION IF EXISTS public.place_order(text, text, text, text, text, text, numeric, numeric, uuid, jsonb, text);
+
 CREATE OR REPLACE FUNCTION public.place_order(
   p_customer_name text,
   p_customer_phone text,
@@ -302,7 +359,8 @@ CREATE OR REPLACE FUNCTION public.place_order(
   p_total_price numeric,
   p_shipping_cost numeric,
   p_user_id uuid DEFAULT NULL,
-  p_items jsonb DEFAULT '[]'::jsonb
+  p_items jsonb DEFAULT '[]'::jsonb,
+  p_city text DEFAULT ''
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -337,13 +395,14 @@ BEGIN
 
   INSERT INTO public.orders (
     user_id, customer_name, customer_phone, customer_email,
-    governorate, address, notes, total_price, shipping_cost, status
+    governorate, city, address, notes, total_price, shipping_cost, status
   ) VALUES (
     p_user_id,
     trim(p_customer_name),
     trim(p_customer_phone),
     nullif(trim(COALESCE(p_customer_email, '')), ''),
     trim(p_governorate),
+    nullif(trim(COALESCE(p_city, '')), ''),
     trim(p_address),
     nullif(trim(COALESCE(p_notes, '')), ''),
     COALESCE(p_total_price, 0),
@@ -395,9 +454,42 @@ GRANT SELECT ON public.admin_users TO authenticated;
 GRANT INSERT ON public.contact_messages TO anon, authenticated;
 GRANT SELECT, UPDATE ON public.contact_messages TO authenticated;
 
+GRANT SELECT ON public.governorates TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.governorates TO authenticated;
+
+GRANT SELECT ON public.cities TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.cities TO authenticated;
+
 GRANT EXECUTE ON FUNCTION public.check_is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.place_order TO anon, authenticated;
+
+-- دوال RPC للمحافظات والمدن
+CREATE OR REPLACE FUNCTION public.get_governorates()
+RETURNS SETOF public.governorates
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT * FROM public.governorates ORDER BY sort_order ASC, name_ar ASC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_governorates() TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_cities(p_governorate_id uuid)
+RETURNS SETOF public.cities
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT * FROM public.cities
+  WHERE governorate_id = p_governorate_id
+  ORDER BY sort_order ASC, name_ar ASC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_cities(uuid) TO anon, authenticated;
 
 -- ─── 8. Storage — bucket أغلفة الكتب ─────────────────────────
 
@@ -430,8 +522,146 @@ CREATE POLICY book_covers_admin_update ON storage.objects
 CREATE POLICY book_covers_admin_delete ON storage.objects
   FOR DELETE USING (bucket_id = 'book-covers' AND public.is_admin());
 
+-- ─── 9. بيانات المحافظات (27 محافظة) — تُدرج فقط إن كان الجدول فارغاً ──
+
+INSERT INTO public.governorates (name_ar, name_en, shipping_cost, sort_order)
+SELECT * FROM (VALUES
+  ('القاهرة', 'Cairo', 50, 1),
+  ('الجيزة', 'Giza', 50, 2),
+  ('الإسكندرية', 'Alexandria', 55, 3),
+  ('الدقهلية', 'Dakahlia', 60, 4),
+  ('الشرقية', 'Sharqia', 60, 5),
+  ('القليوبية', 'Qalyubia', 55, 6),
+  ('الغربية', 'Gharbia', 60, 7),
+  ('المنوفية', 'Menofia', 60, 8),
+  ('البحيرة', 'Beheira', 60, 9),
+  ('كفر الشيخ', 'Kafr El Sheikh', 65, 10),
+  ('دمياط', 'Damietta', 65, 11),
+  ('بورسعيد', 'Port Said', 65, 12),
+  ('الإسماعيلية', 'Ismailia', 65, 13),
+  ('السويس', 'Suez', 65, 14),
+  ('شمال سيناء', 'North Sinai', 90, 15),
+  ('جنوب سيناء', 'South Sinai', 90, 16),
+  ('بني سويف', 'Beni Suef', 70, 17),
+  ('الفيوم', 'Fayoum', 70, 18),
+  ('المنيا', 'Minya', 75, 19),
+  ('أسيوط', 'Assiut', 75, 20),
+  ('سوهاج', 'Sohag', 80, 21),
+  ('قنا', 'Qena', 80, 22),
+  ('الأقصر', 'Luxor', 80, 23),
+  ('أسوان', 'Aswan', 85, 24),
+  ('البحر الأحمر', 'Red Sea', 90, 25),
+  ('مطروح', 'Matrouh', 90, 26),
+  ('الوادي الجديد', 'New Valley', 95, 27)
+) AS v(name_ar, name_en, shipping_cost, sort_order)
+WHERE NOT EXISTS (SELECT 1 FROM public.governorates LIMIT 1);
+
+-- ─── 10. بيانات المدن — تُدرج فقط إن كان الجدول فارغاً ────────
+
+INSERT INTO public.cities (governorate_id, name_ar, name_en, sort_order)
+SELECT g.id, v.name_ar, v.name_en, v.sort_order
+FROM (
+  VALUES
+    ('القاهرة', 'وسط البلد', 'Downtown', 1),
+    ('القاهرة', 'مصر الجديدة', 'Heliopolis', 2),
+    ('القاهرة', 'مدينة نصر', 'Nasr City', 3),
+    ('القاهرة', 'المعادي', 'Maadi', 4),
+    ('القاهرة', 'العباسية', 'Abbaseya', 5),
+    ('القاهرة', 'شبرا', 'Shubra', 6),
+    ('القاهرة', 'الزمالك', 'Zamalek', 7),
+    ('القاهرة', 'المهندسين', 'Mohandeseen', 8),
+    ('القاهرة', 'التجمع الخامس', 'Fifth Settlement', 9),
+    ('القاهرة', 'مدينة الشروق', 'Shorouk City', 10),
+    ('القاهرة', 'مدينة بدر', 'Badr City', 11),
+    ('القاهرة', 'المرج', 'El Marg', 12),
+    ('القاهرة', 'حلوان', 'Helwan', 13),
+    ('القاهرة', 'المطرية', 'Matareya', 14),
+    ('القاهرة', 'عين شمس', 'Ain Shams', 15),
+    ('القاهرة', 'السلام', 'El Salam', 16),
+    ('الجيزة', 'الدقي', 'Dokki', 1),
+    ('الجيزة', 'العجوزة', 'Agouza', 2),
+    ('الجيزة', 'الهرم', 'Haram', 3),
+    ('الجيزة', 'فيصل', 'Faisal', 4),
+    ('الجيزة', 'السادس من أكتوبر', '6th October City', 5),
+    ('الجيزة', 'الشيخ زايد', 'Sheikh Zayed', 6),
+    ('الجيزة', 'إمبابة', 'Imbaba', 7),
+    ('الجيزة', 'البدرشين', 'Badrasheen', 8),
+    ('الجيزة', 'العياط', 'Aiyat', 9),
+    ('الجيزة', 'أوسيم', 'Ossim', 10),
+    ('الجيزة', 'كرداسة', 'Kerdasa', 11),
+    ('الجيزة', 'الواحات', 'Oases', 12),
+    ('الإسكندرية', 'وسط المدينة', 'Downtown', 1),
+    ('الإسكندرية', 'سيدي جابر', 'Sidi Gaber', 2),
+    ('الإسكندرية', 'سان ستيفانو', 'San Stefano', 3),
+    ('الإسكندرية', 'محطة الرمل', 'Mahatet El Raml', 4),
+    ('الإسكندرية', 'العصافرة', 'Asafra', 5),
+    ('الإسكندرية', 'المنتزه', 'Montaza', 6),
+    ('الإسكندرية', 'برج العرب', 'Borg El Arab', 7),
+    ('الإسكندرية', 'أبو قير', 'Abu Qir', 8),
+    ('الإسكندرية', 'كامب شيزار', 'Camp Caesar', 9),
+    ('الإسكندرية', 'السيوف', 'El Soyof', 10),
+    ('الإسكندرية', 'كرموز', 'Karmouz', 11),
+    ('الدقهلية', 'المنصورة', 'Mansoura', 1),
+    ('الدقهلية', 'طلخا', 'Talkha', 2),
+    ('الدقهلية', 'ميت غمر', 'Mit Ghamr', 3),
+    ('الدقهلية', 'دكرنس', 'Dekernes', 4),
+    ('الدقهلية', 'أجا', 'Aga', 5),
+    ('الدقهلية', 'السنبلاوين', 'Sinbillawin', 6),
+    ('الدقهلية', 'تمي الأمديد', 'Tami El Amdid', 7),
+    ('الدقهلية', 'نبروه', 'Nabroh', 8),
+    ('الدقهلية', 'بلقاس', 'Bilqas', 9),
+    ('الدقهلية', 'شربين', 'Sherbin', 10),
+    ('الدقهلية', 'الجمالية', 'Gamalia', 11),
+    ('الدقهلية', 'منية النصر', 'Menia El Nasr', 12),
+    ('الشرقية', 'الزقازيق', 'Zagazig', 1),
+    ('الشرقية', 'بلبيس', 'Belbeis', 2),
+    ('الشرقية', 'العاشر من رمضان', '10th of Ramadan', 3),
+    ('الشرقية', 'منيا القمح', 'Minya El Qamh', 4),
+    ('الشرقية', 'أبو حماد', 'Abu Hammad', 5),
+    ('الشرقية', 'ههيا', 'Hehya', 6),
+    ('الشرقية', 'أبو كبير', 'Abu Kebir', 7),
+    ('الشرقية', 'فاقوس', 'Faqous', 8),
+    ('الشرقية', 'كفر صقر', 'Kafr Saqr', 9),
+    ('الشرقية', 'الحسينية', 'Husseiniya', 10),
+    ('الشرقية', 'صان الحجر', 'San El Hagar', 11),
+    ('القليوبية', 'بنها', 'Banha', 1),
+    ('القليوبية', 'شبرا الخيمة', 'Shubra El Kheima', 2),
+    ('القليوبية', 'قليوب', 'Qalyub', 3),
+    ('القليوبية', 'الخانكة', 'Khanka', 4),
+    ('القليوبية', 'كفر شكر', 'Kafr Shukr', 5),
+    ('القليوبية', 'طوخ', 'Tukh', 6),
+    ('القليوبية', 'قها', 'Qaha', 7),
+    ('القليوبية', 'العبور', 'Obour', 8),
+    ('الغربية', 'طنطا', 'Tanta', 1),
+    ('الغربية', 'المحلة الكبرى', 'Mahalla El Kubra', 2),
+    ('الغربية', 'كفر الزيات', 'Kafr El Zayat', 3),
+    ('الغربية', 'بسيون', 'Basyoun', 4),
+    ('الغربية', 'السنطة', 'El Santa', 5),
+    ('الغربية', 'قطور', 'Qutour', 6),
+    ('الغربية', 'سمنود', 'Sammanoud', 7),
+    ('الغربية', 'زفتى', 'Zefta', 8),
+    ('المنوفية', 'شبين الكوم', 'Shebin El Kom', 1),
+    ('المنوفية', 'منوف', 'Menouf', 2),
+    ('المنوفية', 'الباجور', 'Bagour', 3),
+    ('المنوفية', 'أشمون', 'Ashmon', 4),
+    ('المنوفية', 'تلا', 'Tala', 5),
+    ('المنوفية', 'قويسنا', 'Quesna', 6),
+    ('المنوفية', 'الشهداء', 'Shohada', 7),
+    ('المنوفية', 'بركة السبع', 'Berkat El Saba', 8),
+    ('البحيرة', 'دمنهور', 'Damanhour', 1),
+    ('البحيرة', 'كفر الدوار', 'Kafr El Dawar', 2),
+    ('البحيرة', 'رشيد', 'Rashid', 3),
+    ('البحيرة', 'إدكو', 'Edko', 4),
+    ('البحيرة', 'أبو المطامير', 'Abu El Matamir', 5),
+    ('البحيرة', 'المحمودية', 'Mahmoudia', 6),
+    ('البحيرة', 'الرحمانية', 'Rahmaniya', 7),
+    ('البحيرة', 'إيتاي البارود', 'Itay El Baroud', 8),
+    ('البحيرة', 'حوش عيسى', 'Housh Eissa', 9)
+) AS v(gov_name, name_ar, name_en, sort_order)
+JOIN public.governorates g ON g.name_ar = v.gov_name
+WHERE NOT EXISTS (SELECT 1 FROM public.cities LIMIT 1);
+
 -- ═══ بعد التشغيل ═══
--- 1) شغّل أيضاً backend-fix.sql إن كان المشروع قديماً
--- 2) Settings → API → Reload schema
--- 3) أضف مشرفاً: INSERT INTO admin_users (user_id) SELECT id FROM auth.users WHERE email = '...';
--- 4) تأكد أن Email provider مفعّل في Auth > Providers
+-- 1) Settings → API → Reload schema
+-- 2) أضف مشرفاً: INSERT INTO admin_users (user_id) SELECT id FROM auth.users WHERE email = '...';
+-- 3) تأكد أن Email provider مفعّل في Auth > Providers

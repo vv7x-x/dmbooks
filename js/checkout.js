@@ -13,8 +13,10 @@ const translations = {
         phPhone: "مثال: 01000000000",
         lblGovernorate: "المحافظة *",
         optSelectGov: "اختر المحافظة",
-        lblAddress: "العنوان بالتفصيل *",
-        phAddress: "الشارع، رقم المبنى، الدور، الشقة",
+        lblCity: "المدينة / المركز / الإدارة *",
+        optSelectCity: "اختر المدينة أو المركز",
+        lblAddress: "العنوان بالتفصيل (شارع، مبنى، دور، شقة) *",
+        phAddress: "مثال: شارع النيل، عمارة 5، الدور 3، شقة 12",
         lblNotes: "ملاحظات إضافية (اختياري)",
         phNotes: "مواعيد التوصيل المفضلة، علامة مميزة...",
         lblPaymentTitle: "الدفع عند الاستلام (COD)",
@@ -34,13 +36,6 @@ const translations = {
         networkError: "عذراً، حدث خطأ في الاتصال بالسيرفر. يرجى المحاولة مرة أخرى.",
         requestTimeout: "انتهت مهلة الاتصال. تحقق من الشبكة وحاول مرة أخرى.",
         submitting: "<i class='fa-solid fa-spinner fa-spin'></i> جاري إرسال الطلب...",
-        
-        govCairo: "القاهرة",
-        govGiza: "الجيزة",
-        govAlex: "الإسكندرية",
-        govDelta: "الدلتا والقناة (طنطا، المنصورة، السويس...)",
-        govUpper: "الصعيد (المنيا، أسيوط، سوهاج...)",
-        govRemote: "المناطق النائية (البحر الأحمر، مطروح...)",
         
         footerAbout: "بوابتك لعالم المعرفة والقصص الملهمة. نوفر تشكيلة مميزة من الكتب العربية والإنجليزية التي تُثري عقول القراء في جميع أنحاء الوطن العربي.",
         footerQuickLinks: "روابط سريعة",
@@ -66,8 +61,10 @@ const translations = {
         phPhone: "e.g., 01000000000",
         lblGovernorate: "Governorate *",
         optSelectGov: "Select your governorate",
+        lblCity: "City / District *",
+        optSelectCity: "Select your city or district",
         lblAddress: "Detailed Address *",
-        phAddress: "Street name, building, floor, apartment",
+        phAddress: "e.g., Nile Street, Building 5, Floor 3, Apt 12",
         lblNotes: "Additional Notes (optional)",
         phNotes: "Preferred delivery timing, landmarks...",
         lblPaymentTitle: "Cash on Delivery (COD)",
@@ -88,13 +85,6 @@ const translations = {
         requestTimeout: "The request timed out. Check your connection and try again.",
         submitting: "<i class='fa-solid fa-spinner fa-spin'></i> Placing order...",
         
-        govCairo: "Cairo",
-        govGiza: "Giza",
-        govAlex: "Alexandria",
-        govDelta: "Delta & Canal (Tanta, Mansoura, Suez...)",
-        govUpper: "Upper Egypt (Minya, Asyut, Sohag...)",
-        govRemote: "Remote Areas (Red Sea, Matrouh...)",
-        
         footerAbout: "Your gateway to knowledge and inspiring stories. We offer a curated selection of Arabic and English books that enrich readers across the Arab world.",
         footerQuickLinks: "Quick Links",
         footerLinkHome: "Home",
@@ -113,25 +103,10 @@ let cart = JSON.parse(localStorage.getItem("cart")) || [];
 let shippingCost = 0;
 let cartSubtotal = 0;
 
-// Shipping fees mapping based on select value
-const shippingRates = {
-    cairo: 50,
-    giza: 50,
-    alexandria: 60,
-    delta: 70,
-    upper: 80,
-    remote: 100
-};
-
-/** مفاتيح ترجمة المحافظات — منفصلة عن منطق الإرسال */
-const GOV_LABEL_KEYS = {
-    cairo: "govCairo",
-    giza: "govGiza",
-    alexandria: "govAlex",
-    delta: "govDelta",
-    upper: "govUpper",
-    remote: "govRemote",
-};
+// بيانات المحافظات والمدن (تُحمّل من قاعدة البيانات)
+let governorates = [];
+let cities = [];
+let selectedGovernorateData = null;
 
 let submitBtnOriginalHtml = "";
 let isSubmittingOrder = false;
@@ -150,6 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyLanguage(currentLang);
     calculateSubtotal();
     renderSummary();
+    await loadGovernorates();
     calculateShipping();
     await prefillCheckoutFromSession();
 });
@@ -172,6 +148,73 @@ async function prefillCheckoutFromSession() {
     } catch (e) {
         console.warn("prefill checkout", e);
     }
+}
+
+// جلب المحافظات من قاعدة البيانات
+async function loadGovernorates() {
+    try {
+        const supabase = window.getSupabaseClient && window.getSupabaseClient();
+        if (!supabase) return;
+
+        const { data, error } = await supabase.rpc("get_governorates");
+        if (error) throw error;
+        governorates = data || [];
+
+        const govSelect = document.getElementById("governorate");
+        if (!govSelect) return;
+
+        govSelect.innerHTML = `<option value="" disabled selected id="optSelectGov">${translations[currentLang].optSelectGov}</option>`;
+
+        governorates.forEach(gov => {
+            const opt = document.createElement("option");
+            opt.value = gov.id;
+            opt.textContent = currentLang === "ar" ? gov.name_ar : gov.name_en;
+            opt.dataset.shipping = gov.shipping_cost;
+            govSelect.appendChild(opt);
+        });
+    } catch (err) {
+        console.warn("[checkout] loadGovernorates:", err);
+    }
+}
+
+// عند تغيير المحافظة — تحميل المدن
+async function onGovernorateChange() {
+    const govSelect = document.getElementById("governorate");
+    const govId = govSelect.value;
+    const citySelect = document.getElementById("city");
+
+    cities = [];
+    citySelect.innerHTML = `<option value="" disabled selected id="optSelectCity">${translations[currentLang].optSelectCity}</option>`;
+    citySelect.disabled = true;
+
+    if (!govId) {
+        calculateShipping();
+        return;
+    }
+
+    selectedGovernorateData = governorates.find(g => g.id === govId);
+
+    try {
+        const supabase = window.getSupabaseClient && window.getSupabaseClient();
+        if (!supabase) return;
+
+        const { data, error } = await supabase.rpc("get_cities", { p_governorate_id: govId });
+        if (error) throw error;
+        cities = data || [];
+
+        cities.forEach(city => {
+            const opt = document.createElement("option");
+            opt.value = city.id;
+            opt.textContent = currentLang === "ar" ? city.name_ar : city.name_en;
+            citySelect.appendChild(opt);
+        });
+
+        citySelect.disabled = false;
+    } catch (err) {
+        console.warn("[checkout] loadCities:", err);
+    }
+
+    calculateShipping();
 }
 
 // Switch Language
@@ -227,6 +270,7 @@ function applyLanguage(lang) {
     safeSetPlaceholder("phone", t.phPhone);
     
     safeSetText("lblGovernorate", t.lblGovernorate);
+    safeSetText("lblCity", t.lblCity);
     safeSetText("lblAddress", t.lblAddress);
     safeSetPlaceholder("address", t.phAddress);
     
@@ -242,16 +286,37 @@ function applyLanguage(lang) {
     safeSetText("lblShipping", t.lblShipping);
     safeSetText("lblTotal", t.lblTotal);
     
-    // Translate governorate options
+    // Translate governorate options dynamically
     const govSelect = document.getElementById("governorate");
-    if (govSelect) {
-        govSelect.options[0].text = t.optSelectGov;
-        govSelect.options[1].text = t.govCairo;
-        govSelect.options[2].text = t.govGiza;
-        govSelect.options[3].text = t.govAlex;
-        govSelect.options[4].text = t.govDelta;
-        govSelect.options[5].text = t.govUpper;
-        govSelect.options[6].text = t.govRemote;
+    if (govSelect && governorates.length > 0) {
+        const selectedVal = govSelect.value;
+        govSelect.innerHTML = `<option value="" disabled selected id="optSelectGov">${t.optSelectGov}</option>`;
+        governorates.forEach(gov => {
+            const opt = document.createElement("option");
+            opt.value = gov.id;
+            opt.textContent = lang === "ar" ? gov.name_ar : gov.name_en;
+            opt.dataset.shipping = gov.shipping_cost;
+            if (gov.id === selectedVal) opt.selected = true;
+            govSelect.appendChild(opt);
+        });
+    }
+    
+    // Translate city options dynamically
+    const citySelect = document.getElementById("city");
+    if (citySelect && cities.length > 0) {
+        const selectedCityVal = citySelect.value;
+        citySelect.innerHTML = `<option value="" disabled selected id="optSelectCity">${t.optSelectCity}</option>`;
+        cities.forEach(city => {
+            const opt = document.createElement("option");
+            opt.value = city.id;
+            opt.textContent = lang === "ar" ? city.name_ar : city.name_en;
+            if (city.id === selectedCityVal) opt.selected = true;
+            citySelect.appendChild(opt);
+        });
+        citySelect.disabled = false;
+    } else if (citySelect) {
+        citySelect.innerHTML = `<option value="" disabled selected id="optSelectCity">${t.optSelectCity}</option>`;
+        citySelect.disabled = true;
     }
     
     // Success panel
@@ -311,10 +376,11 @@ function renderSummary() {
 
 function calculateShipping() {
     const govSelect = document.getElementById("governorate");
-    const selectedGov = govSelect.value;
+    const selectedGovId = govSelect.value;
     const t = translations[currentLang];
     
-    shippingCost = shippingRates[selectedGov] || 0;
+    const gov = governorates.find(g => g.id === selectedGovId);
+    shippingCost = gov ? Number(gov.shipping_cost) : 0;
     
     document.getElementById("summaryShipping").innerText = `${shippingCost} ${t.currency}`;
     
@@ -536,10 +602,16 @@ function setSubmitLoading(loading) {
     }
 }
 
-function getGovernorateLabel(code) {
-    const t = translations[currentLang];
-    const key = GOV_LABEL_KEYS[code];
-    return key && t[key] ? t[key] : code;
+function getGovernorateName(govId) {
+    const gov = governorates.find(g => g.id === govId);
+    if (!gov) return govId;
+    return currentLang === "ar" ? gov.name_ar : gov.name_en;
+}
+
+function getCityName(cityId) {
+    const city = cities.find(c => c.id === cityId);
+    if (!city) return cityId;
+    return currentLang === "ar" ? city.name_ar : city.name_en;
 }
 
 /** التحقق من الحقول قبل الإرسال */
@@ -548,6 +620,7 @@ function validateCheckoutForm() {
     const fullName = document.getElementById("fullName")?.value.trim() || "";
     const phone = document.getElementById("phone")?.value.trim() || "";
     const governorate = document.getElementById("governorate")?.value || "";
+    const city = document.getElementById("city")?.value || "";
     const address = document.getElementById("address")?.value.trim() || "";
 
     if (!cart.length) {
@@ -571,10 +644,10 @@ function validateCheckoutForm() {
             message: currentLang === "ar" ? "يرجى اختيار المحافظة." : "Please select a governorate.",
         };
     }
-    if (!shippingRates[governorate]) {
+    if (!city) {
         return {
             ok: false,
-            message: currentLang === "ar" ? "محافظة غير صالحة." : "Invalid governorate.",
+            message: currentLang === "ar" ? "يرجى اختيار المدينة أو الإدارة." : "Please select a city or district.",
         };
     }
     if (address.length < 5) {
@@ -586,19 +659,25 @@ function validateCheckoutForm() {
 
     return {
         ok: true,
-        data: { fullName, phone, governorate, address, notes: document.getElementById("notes")?.value.trim() || "" },
+        data: { fullName, phone, governorate, city, address, notes: document.getElementById("notes")?.value.trim() || "" },
     };
 }
 
 /** بناء payload الطلب */
 function buildOrderPayload(formData, session) {
+    const govName = getGovernorateName(formData.governorate);
+    const cityName = getCityName(formData.city);
+    const fullAddress = `${cityName}، ${formData.address}`;
+    
     return {
         user_id: session?.user?.id || null,
         customer_name: formData.fullName,
         customer_phone: formData.phone,
         customer_email: session?.user?.email || null,
-        governorate: getGovernorateLabel(formData.governorate),
+        governorate: govName,
+        city: cityName,
         address: formData.address,
+        full_address: fullAddress,
         notes: formData.notes,
         total_price: Number((cartSubtotal + shippingCost).toFixed(2)),
         shipping_cost: shippingCost,
@@ -619,6 +698,7 @@ async function placeOrderViaRpc(supabase, payload) {
             p_customer_phone: payload.customer_phone,
             p_customer_email: payload.customer_email,
             p_governorate: payload.governorate,
+            p_city: payload.city || "",
             p_address: payload.address,
             p_notes: payload.notes || "",
             p_total_price: payload.total_price,
@@ -647,6 +727,7 @@ async function placeOrderDirect(supabase, payload) {
                     customer_phone: payload.customer_phone,
                     customer_email: payload.customer_email,
                     governorate: payload.governorate,
+                    city: payload.city || "",
                     address: payload.address,
                     notes: payload.notes,
                     total_price: payload.total_price,
@@ -787,3 +868,5 @@ window.addEventListener("unhandledrejection", (event) => {
 window.handleCheckoutSubmit = handleCheckoutSubmit;
 window.submitOrder = submitOrder;
 window.resetSubmitButton = resetSubmitButton;
+window.onGovernorateChange = onGovernorateChange;
+window.loadGovernorates = loadGovernorates;

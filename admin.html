@@ -60,6 +60,9 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
           <li class="admin-nav-item" id="tabBtnBooks">
             <button type="button" onclick="switchTab('books')"><i class="fa-solid fa-book"></i> <span id="btnTabBooksText">إدارة الكتب</span></button>
           </li>
+          <li class="admin-nav-item" id="tabBtnGovernorates">
+            <button type="button" onclick="switchTab('governorates')"><i class="fa-solid fa-map-location-dot"></i> <span id="btnTabGovText">المحافظات والشحن</span></button>
+          </li>
           <li class="admin-nav-spacer"></li>
           <li><a href="index.html" class="admin-nav-link"><i class="fa-solid fa-store"></i> المتجر</a></li>
           <li><button type="button" class="btn btn-outline btn-sidebar" onclick="openAddBookModal()" id="btnAddBookBtn"><i class="fa-solid fa-plus"></i> إضافة كتاب</button></li>
@@ -117,6 +120,58 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                 <tr class="table-loading-row"><td colspan="7" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل الطلبات...</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- قسم إدارة المحافظات -->
+        <div id="paneGovernorates" class="admin-pane" style="display:none;">
+          <div class="admin-pane-header admin-card">
+            <div>
+              <h3 id="govPaneTitle">إدارة المحافظات وأسعار الشحن</h3>
+              <p id="govCount" class="admin-stat">عدد المحافظات: 0</p>
+            </div>
+            <div class="admin-actions-group" style="display: flex; gap: 10px;">
+              <button type="button" class="btn btn-primary" onclick="openAddGovernorateModal()"><i class="fa-solid fa-plus"></i> <span id="btnAddGovText">إضافة محافظة</span></button>
+            </div>
+          </div>
+
+          <div class="admin-table-container admin-card">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th id="thGovName">المحافظة</th>
+                  <th id="thGovShipping">سعر التوصيل (ج.م)</th>
+                  <th id="thGovCities">عدد المدن</th>
+                  <th id="thGovActions">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="governoratesTableBody">
+                <tr class="table-loading-row"><td colspan="4" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل المحافظات...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- قسم المدن داخل المحافظة -->
+          <div id="citySection" class="admin-card" style="margin-top: 20px; display: none;">
+            <div class="admin-pane-header" style="border-bottom: 1px solid rgba(197,150,58,0.15); padding-bottom: 15px; margin-bottom: 15px;">
+              <div>
+                <h4 id="citySectionTitle">مدن ومراكز <span id="selectedGovName">-</span></h4>
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="openAddCityModal()"><i class="fa-solid fa-plus"></i> <span id="btnAddCityText">إضافة مدينة</span></button>
+            </div>
+            <div class="admin-table-container">
+              <table class="admin-table admin-table-compact">
+                <thead>
+                  <tr>
+                    <th id="thCityName">المدينة / المركز</th>
+                    <th id="thCityActions">حذف</th>
+                  </tr>
+                </thead>
+                <tbody id="citiesTableBody">
+                  <tr><td colspan="2" style="text-align:center; color:var(--ink-muted);">اختر محافظة لعرض مدنها</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -215,6 +270,47 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="closeAddBookModal()" id="btnCancelBook">إلغاء</button>
             <button type="submit" class="btn btn-primary" id="btnSubmitBook">حفظ وإضافة</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ================= مودال: إضافة محافظة ================= -->
+    <div class="modal" id="addGovernorateModal">
+      <div class="modal-content admin-card" style="max-width:500px;">
+        <div class="modal-header">
+          <h3 id="addGovModalTitle">إضافة محافظة جديدة</h3>
+          <button type="button" onclick="closeAddGovernorateModal()" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="addGovernorateForm" onsubmit="submitGovernorate(event)">
+          <div class="modal-body">
+            <div class="form-group"><label id="lblGovNameAr">اسم المحافظة (عربي) *</label><input id="govNameArInput" required></div>
+            <div class="form-group"><label id="lblGovNameEn">اسم المحافظة (English) *</label><input id="govNameEnInput" required></div>
+            <div class="form-group"><label id="lblGovShipping">سعر التوصيل (ج.م) *</label><input id="govShippingInput" type="number" step="0.01" min="0" required></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeAddGovernorateModal()" id="btnCancelGov">إلغاء</button>
+            <button type="submit" class="btn btn-primary" id="btnSubmitGov">حفظ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ================= مودال: إضافة مدينة ================= -->
+    <div class="modal" id="addCityModal">
+      <div class="modal-content admin-card" style="max-width:500px;">
+        <div class="modal-header">
+          <h3 id="addCityModalTitle">إضافة مدينة / مركز</h3>
+          <button type="button" onclick="closeAddCityModal()" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="addCityForm" onsubmit="submitCity(event)">
+          <div class="modal-body">
+            <div class="form-group"><label id="lblCityNameAr">الاسم (عربي) *</label><input id="cityNameArInput" required></div>
+            <div class="form-group"><label id="lblCityNameEn">الاسم (English) *</label><input id="cityNameEnInput" required></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeAddCityModal()" id="btnCancelCity">إلغاء</button>
+            <button type="submit" class="btn btn-primary" id="btnSubmitCity">حفظ</button>
           </div>
         </form>
       </div>

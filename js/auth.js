@@ -242,7 +242,7 @@
               <span class="order-status order-status--${o.status || 'pending'}">${st}</span>
             </div>
             <p class="order-meta">${o.customer_name || '—'} · ${itemsCount} منتج · ${total} ج.م</p>
-            <p class="order-meta">${o.governorate || ''} — ${new Date(o.created_at).toLocaleString('ar-EG')}</p>
+            <p class="order-meta">${o.governorate || ''} ${o.city ? '· ' + o.city : ''} — ${new Date(o.created_at).toLocaleString('ar-EG')}</p>
           </article>`;
         })
         .join('');

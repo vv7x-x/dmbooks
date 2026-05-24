@@ -187,7 +187,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (hydrateBooksFromCache()) {
         renderBooksGrid();
-        window.dmHeroBooks?.updateHeroFromBooks(allBooks);
     } else {
         showBooksSkeleton(SKELETON_COUNT);
     }
@@ -201,16 +200,11 @@ document.addEventListener("DOMContentLoaded", () => {
         showBooksLoadError(msg);
     });
 
-    window.dmHeroBooks?.initHeroBooks()?.catch?.((err) => {
-        console.warn("[index] hero:", err);
-    });
-
     updateCartCount();
     updateWishlistCount();
     requestAnimationFrame(() => {
         renderCart();
         renderWishlist();
-        initHeroParallax();
     });
 });
 
@@ -390,7 +384,6 @@ async function loadBooksFromDB(forceRefresh = false) {
         }
         
         renderBooksGrid();
-        window.dmHeroBooks?.updateHeroFromBooks(allBooks);
     } catch (err) {
         const normalized = window.dmApiGuard?.normalizeError ? window.dmApiGuard.normalizeError(err) : err;
         console.error("[index] Error loading books:", normalized);
@@ -742,19 +735,4 @@ function renderWishlist() {
     }).join("");
 }
 
-function initHeroParallax() {
-    const heroVisual = document.querySelector('.hero-visual');
-    const bookStack = document.getElementById('heroBookStack') || document.querySelector('.book-stack');
-    if (!heroVisual || !bookStack) return;
 
-    heroVisual.addEventListener('mousemove', (event) => {
-        const rect = heroVisual.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width - 0.5) * 16;
-        const y = ((event.clientY - rect.top) / rect.height - 0.5) * -12;
-        bookStack.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
-    });
-
-    heroVisual.addEventListener('mouseleave', () => {
-        bookStack.style.transform = 'rotateY(0deg) rotateX(0deg)';
-    });
-}

@@ -69,6 +69,18 @@ const translations = {
         uploadPromptText: "اضغط هنا لاختيار صورة الغلاف أو اسحبها هنا",
         btnCancelBook: "إلغاء",
         btnSubmitBook: "حفظ وإضافة",
+        btnUpdateBook: "حفظ التعديلات",
+        editBookModalTitle: "تعديل الكتاب",
+        addBookModalTitle2: "إضافة كتاب جديد",
+        btnEditBook: "تعديل",
+        bookUpdatedSuccess: "تم تحديث الكتاب بنجاح ✅",
+        bookUpdatedError: "فشل تحديث الكتاب",
+        bookAddedSuccess: "تمت إضافة الكتاب بنجاح ✅",
+        validationRequired: "يرجى ملء جميع الحقول المطلوبة.",
+        validationImageType: "يُسمح فقط بصور JPG و PNG و WebP.",
+        validationImageSize: "حجم الصورة يجب ألا يتجاوز 5 ميجابايت.",
+        currentCoverLabel: "الغلاف الحالي:",
+        coverNotChanged: "(لن يتم تغيير الغلاف ما لم تختر صورة جديدة)",
         orderDetailsModalTitle: "تفاصيل الطلب",
         orderCustInfoTitle: "بيانات العميل",
         lblDetName: "الاسم:",
@@ -194,6 +206,18 @@ const translations = {
         uploadPromptText: "Click to upload cover image or drag & drop",
         btnCancelBook: "Cancel",
         btnSubmitBook: "Save Book",
+        btnUpdateBook: "Save Changes",
+        editBookModalTitle: "Edit Book",
+        addBookModalTitle2: "Add New Book",
+        btnEditBook: "Edit",
+        bookUpdatedSuccess: "Book updated successfully ✅",
+        bookUpdatedError: "Failed to update book",
+        bookAddedSuccess: "Book added successfully ✅",
+        validationRequired: "Please fill all required fields.",
+        validationImageType: "Only JPG, PNG & WebP images are allowed.",
+        validationImageSize: "Image size must not exceed 5MB.",
+        currentCoverLabel: "Current cover:",
+        coverNotChanged: "(Cover won't change unless you pick a new image)",
         orderDetailsModalTitle: "Order Details",
         orderCustInfoTitle: "Customer Info",
         lblDetName: "Name:",
@@ -262,6 +286,7 @@ let selectedGovId = null;
 let selectedOrderId = null;
 let preparedCoverBlob = null;
 let preparedCoverPreviewUrl = null;
+let editingBookId = null;
 
 function getSb() {
     const client = window.getSupabaseClient && window.getSupabaseClient();
@@ -301,6 +326,21 @@ function showAdminDashboardAlert(text, type) {
     el.textContent = text;
     el.className = "admin-dashboard-alert" + (type ? ` admin-dashboard-alert--${type}` : "");
     el.hidden = false;
+}
+
+function showAdminToast(message, type) {
+    const toast = document.getElementById("adminToast");
+    const msgEl = document.getElementById("adminToastMessage");
+    if (!toast || !msgEl) return;
+    msgEl.textContent = message;
+    toast.className = "admin-toast" + (type ? ` admin-toast--${type}` : "");
+    toast.hidden = false;
+    setTimeout(() => { toast.hidden = true; }, 4000);
+}
+
+function hideAdminToast() {
+    const toast = document.getElementById("adminToast");
+    if (toast) toast.hidden = true;
 }
 
 function showAdminLoginMessage(text, type) {
@@ -1143,9 +1183,14 @@ function renderBooksTable(booksToRender = currentBooks) {
                 </button>
             </td>
             <td>
-                <button class="action-btn" style="color:var(--danger); border:none; background:transparent; cursor:pointer;" onclick="deleteBook('${book.id}')" title="${t.thBookActions}">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
+                <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+                    <button class="action-btn edit-btn" style="color:var(--gold); border:none; background:transparent; cursor:pointer;" onclick="openEditBookModal('${book.id}')" title="${t.btnEditBook}">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button class="action-btn" style="color:var(--danger); border:none; background:transparent; cursor:pointer;" onclick="deleteBook('${book.id}')" title="${t.thBookActions}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
             </td>
         </tr>`;
     }).join("");
@@ -1179,6 +1224,7 @@ async function deleteBook(bookId) {
         
         // تصفير الكاش لإجبار الموقع على إعادة جلب البيانات المحدثة
         localStorage.setItem("dm_books_cache_time", "0");
+        window.dmBooks?.clearCache?.();
         
         currentBooks = currentBooks.filter(b => b.id !== bookId);
         filterBooks();
@@ -1187,14 +1233,6 @@ async function deleteBook(bookId) {
         console.error("[admin] deleteBook:", err);
         alert(msg);
     }
-}
-
-function openAddBookModal() { document.getElementById("addBookModal").classList.add("open"); }
-
-function closeAddBookModal() {
-    document.getElementById("addBookModal").classList.remove("open");
-    document.getElementById("addBookForm").reset();
-    clearPreparedCover();
 }
 
 function clearPreparedCover() {
@@ -1206,6 +1244,291 @@ function clearPreparedCover() {
     if (promptText) promptText.style.display = "block";
     const hint = document.getElementById("coverCompressHint");
     if (hint) hint.hidden = true;
+}
+
+// ========================
+// نظام تعديل الكتاب المتكامل
+// ========================
+
+function openAddBookModal() {
+    editingBookId = null;
+    document.getElementById("editingBookIdInput").value = "";
+    const t = translations[currentLang];
+    document.getElementById("addBookModalTitle").innerHTML = t.addBookModalTitle;
+    document.getElementById("btnSubmitBook").innerHTML = t.btnSubmitBook;
+    document.getElementById("addBookForm").reset();
+    clearPreparedCover();
+    document.getElementById("currentCoverInfo").style.display = "none";
+    document.getElementById("bookCoverFile").required = false;
+    document.getElementById("addBookModal").classList.add("open");
+}
+
+function openEditBookModal(bookId) {
+    const t = translations[currentLang];
+    if (!bookId) { showAdminToast(t.bookUpdatedError, "error"); return; }
+
+    const book = currentBooks.find(b => b.id === bookId);
+    if (!book) {
+        showAdminDashboardAlert(
+            currentLang === "ar" ? "لم يتم العثور على الكتاب." : "Book not found.",
+            "error"
+        );
+        return;
+    }
+
+    editingBookId = bookId;
+    document.getElementById("editingBookIdInput").value = bookId;
+    document.getElementById("addBookModalTitle").innerHTML = t.editBookModalTitle;
+    document.getElementById("btnSubmitBook").innerHTML = t.btnUpdateBook;
+
+    document.getElementById("bookTitleInput").value = book.title || "";
+    document.getElementById("bookAuthorInput").value = book.author || "";
+    document.getElementById("bookPriceInput").value = book.price || "";
+    document.getElementById("bookCategoryInput").value = book.category || "novels";
+    document.getElementById("bookLanguageInput").value = book.language || "ar";
+    document.getElementById("bookDescInput").value = book.description || "";
+
+    document.getElementById("bookCoverFile").required = false;
+
+    clearPreparedCover();
+
+    const coverInfo = document.getElementById("currentCoverInfo");
+    const preview = document.getElementById("bookCoverPreview");
+    const promptText = document.getElementById("uploadPromptText");
+
+    if (book.image_url) {
+        const coverSrc = window.dmBooks?.bookCoverUrl
+            ? window.dmBooks.bookCoverUrl(book.image_url, 200)
+            : book.image_url;
+        preview.src = coverSrc;
+        preview.style.display = "inline-block";
+        promptText.style.display = "none";
+        coverInfo.style.display = "block";
+        coverInfo.innerHTML = `<span style="color:var(--ink-muted);font-size:13px;">${t.currentCoverLabel}</span>
+            <span style="color:var(--gold);font-weight:700;font-size:13px;margin-right:4px;">${book.title}</span>
+            <br><span style="color:var(--ink-muted);font-size:12px;">${t.coverNotChanged}</span>`;
+    } else {
+        coverInfo.style.display = "none";
+        preview.style.display = "none";
+        promptText.style.display = "block";
+    }
+
+    document.getElementById("addBookModal").classList.add("open");
+}
+
+async function handleBookSubmit(e) {
+    e.preventDefault();
+    const bookId = document.getElementById("editingBookIdInput").value;
+    if (bookId) {
+        await updateBook(bookId);
+    } else {
+        await addBook();
+    }
+}
+
+function validateBookForm() {
+    const t = translations[currentLang];
+    const title = document.getElementById("bookTitleInput").value.trim();
+    const author = document.getElementById("bookAuthorInput").value.trim();
+    const price = document.getElementById("bookPriceInput").value.trim();
+
+    if (!title || !author || !price) {
+        showAdminToast(t.validationRequired, "error");
+        return false;
+    }
+    return true;
+}
+
+function validateFileType(file) {
+    if (!file) return true;
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+        showAdminToast(translations[currentLang].validationImageType, "error");
+        return false;
+    }
+    return true;
+}
+
+function validateFileSize(file) {
+    if (!file) return true;
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+        showAdminToast(translations[currentLang].validationImageSize, "error");
+        return false;
+    }
+    return true;
+}
+
+async function addBook() {
+    const t = translations[currentLang];
+    const saveBtn = document.getElementById("btnSubmitBook");
+    const originalBtn = saveBtn.innerHTML;
+
+    if (!validateBookForm()) return;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = t.saving;
+
+    const title = document.getElementById("bookTitleInput").value.trim();
+    const author = document.getElementById("bookAuthorInput").value.trim();
+    const price = parseFloat(document.getElementById("bookPriceInput").value);
+    const category = document.getElementById("bookCategoryInput").value;
+    const language = document.getElementById("bookLanguageInput").value;
+    const description = document.getElementById("bookDescInput").value.trim();
+    const fileInput = document.getElementById("bookCoverFile");
+    const rawFile = fileInput.files[0];
+
+    if (rawFile && (!validateFileType(rawFile) || !validateFileSize(rawFile))) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+        return;
+    }
+
+    let coverBlob = preparedCoverBlob || rawFile;
+
+    try {
+        const { data: inserted } = await adminRun("admin.books.insert", () =>
+            getSb()
+                .from("books")
+                .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
+                .select()
+                .single()
+        );
+
+        const newBook = inserted;
+        if (coverBlob) newBook._coverUploading = true;
+
+        currentBooks.unshift(newBook);
+        if (activeTab !== "books") switchTab("books");
+        else filterBooks();
+
+        closeAddBookModal();
+        showAdminToast(t.bookAddedSuccess, "success");
+
+        if (coverBlob && newBook.id) {
+            uploadCoverInBackground(newBook.id, coverBlob).catch(() => {
+                const b = currentBooks.find((x) => x.id === newBook.id);
+                if (b) { b._coverUploading = false; filterBooks(); }
+            });
+        }
+
+        localStorage.setItem("dm_books_cache_time", "0");
+    } catch (err) {
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message ||
+            (currentLang === "ar" ? "فشل الإضافة" : "Failed to add book");
+        console.error("[admin] addBook:", err);
+        showAdminToast(msg, "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+    }
+}
+
+async function updateBook(bookId) {
+    const t = translations[currentLang];
+    const saveBtn = document.getElementById("btnSubmitBook");
+    const originalBtn = saveBtn.innerHTML;
+
+    if (!validateBookForm()) return;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = t.saving;
+
+    const title = document.getElementById("bookTitleInput").value.trim();
+    const author = document.getElementById("bookAuthorInput").value.trim();
+    const price = parseFloat(document.getElementById("bookPriceInput").value);
+    const category = document.getElementById("bookCategoryInput").value;
+    const language = document.getElementById("bookLanguageInput").value;
+    const description = document.getElementById("bookDescInput").value.trim();
+    const fileInput = document.getElementById("bookCoverFile");
+    const rawFile = fileInput.files[0];
+
+    if (rawFile && (!validateFileType(rawFile) || !validateFileSize(rawFile))) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+        return;
+    }
+
+    const hasNewCover = !!(preparedCoverBlob || rawFile);
+
+    try {
+        const updateData = {
+            title,
+            author,
+            price,
+            category,
+            language,
+            description,
+        };
+
+        const { error: updateError } = await getSb()
+            .from("books")
+            .update(updateData)
+            .eq("id", bookId);
+
+        if (updateError) throw updateError;
+
+        if (hasNewCover) {
+            const coverBlob = preparedCoverBlob || rawFile;
+            const sb = getSb();
+            const filePath = `covers/${bookId}.jpg`;
+
+            const { error: uploadError } = await sb.storage
+                .from("book-covers")
+                .upload(filePath, coverBlob, { contentType: "image/jpeg", upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = sb.storage.from("book-covers").getPublicUrl(filePath);
+
+            const { error: urlUpdateError } = await getSb()
+                .from("books")
+                .update({ image_url: urlData.publicUrl })
+                .eq("id", bookId);
+
+            if (urlUpdateError) throw urlUpdateError;
+
+            const book = currentBooks.find((b) => b.id === bookId);
+            if (book) {
+                book.image_url = urlData.publicUrl;
+                book._coverUploading = false;
+            }
+        }
+
+        const updatedBook = currentBooks.find((b) => b.id === bookId);
+        if (updatedBook) {
+            updatedBook.title = title;
+            updatedBook.author = author;
+            updatedBook.price = price;
+            updatedBook.category = category;
+            updatedBook.language = language;
+            updatedBook.description = description;
+        }
+
+        localStorage.setItem("dm_books_cache_time", "0");
+        window.dmBooks?.clearCache?.();
+
+        closeAddBookModal();
+        filterBooks();
+        showAdminToast(t.bookUpdatedSuccess, "success");
+    } catch (err) {
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message ||
+            t.bookUpdatedError;
+        console.error("[admin] updateBook:", err);
+        showAdminToast(msg, "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtn;
+    }
+}
+
+function closeAddBookModal() {
+    editingBookId = null;
+    document.getElementById("editingBookIdInput").value = "";
+    document.getElementById("addBookModal").classList.remove("open");
+    document.getElementById("addBookForm").reset();
+    clearPreparedCover();
+    document.getElementById("currentCoverInfo").style.display = "none";
 }
 
 function triggerFileInput() { document.getElementById("bookCoverFile").click(); }
@@ -1256,61 +1579,6 @@ async function uploadCoverInBackground(bookId, blob) {
         book.image_url = urlData.publicUrl;
         book._coverUploading = false;
         filterBooks();
-    }
-}
-
-async function submitNewBook(e) {
-    e.preventDefault();
-    const t = translations[currentLang];
-    const saveBtn = document.getElementById("btnSubmitBook");
-    const originalBtn = saveBtn.innerHTML;
-
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = t.saving;
-
-    const title = document.getElementById("bookTitleInput").value.trim();
-    const author = document.getElementById("bookAuthorInput").value.trim();
-    const price = parseFloat(document.getElementById("bookPriceInput").value);
-    const category = document.getElementById("bookCategoryInput").value;
-    const language = document.getElementById("bookLanguageInput").value;
-    const description = document.getElementById("bookDescInput").value.trim();
-    const fileInput = document.getElementById("bookCoverFile");
-    const rawFile = fileInput.files[0];
-
-    let coverBlob = preparedCoverBlob || rawFile;
-
-    try {
-        const { data: inserted } = await adminRun("admin.books.insert", () =>
-            getSb()
-                .from("books")
-                .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
-                .select()
-                .single()
-        );
-
-        const newBook = inserted;
-        if (coverBlob) newBook._coverUploading = true;
-
-        currentBooks.unshift(newBook);
-        if (activeTab !== "books") switchTab("books"); else filterBooks();
-
-        closeAddBookModal();
-
-        if (coverBlob && newBook.id) {
-            uploadCoverInBackground(newBook.id, coverBlob).catch(() => {
-                const b = currentBooks.find((x) => x.id === newBook.id);
-                if (b) { b._coverUploading = false; filterBooks(); }
-            });
-        }
-    } catch (err) {
-        const msg = window.dmApiGuard?.normalizeError?.(err)?.message ||
-            (currentLang === "ar" ? "فشل الإضافة" : "Failed to add book");
-        console.error("[admin] submitNewBook:", err);
-        showAdminDashboardAlert(msg, "error");
-        alert(msg);
-    } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = originalBtn;
     }
 }
 

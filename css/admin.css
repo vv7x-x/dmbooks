@@ -962,6 +962,12 @@ MODALS
 FORMS
 ===================================================== */
 
+.form-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}
+
 .form-group{
 
     margin-bottom:18px;
@@ -1202,4 +1208,93 @@ RESPONSIVE
 
         gap:12px;
     }
+}
+
+/* =====================================================
+EDIT BUTTON
+===================================================== */
+
+.edit-btn {
+    transition: transform var(--transition), color var(--transition);
+}
+
+.edit-btn:hover {
+    transform: scale(1.15);
+    color: #b87f2a !important;
+}
+
+/* =====================================================
+TOAST NOTIFICATION
+===================================================== */
+
+.admin-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-radius: 16px;
+    background: var(--walnut-dark);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    animation: toastSlideUp 0.4s ease;
+    direction: ltr;
+}
+
+.admin-toast--success {
+    background: #2d6a3a;
+    border: 1px solid rgba(100,200,120,0.3);
+}
+
+.admin-toast--error {
+    background: #7a2e2e;
+    border: 1px solid rgba(220,100,100,0.3);
+}
+
+.admin-toast-close {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.admin-toast-close:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* =====================================================
+CURRENT FILE INFO (EDIT MODE)
+===================================================== */
+
+.current-file-info {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(197,150,58,0.08);
+    border-radius: 10px;
+    border: 1px solid rgba(197,150,58,0.15);
 }

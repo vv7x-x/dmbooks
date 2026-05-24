@@ -211,7 +211,7 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                   <th id="thBookLang">اللغة</th>
                   <th id="thBookPrice">السعر</th>
                   <th id="thBookStock">التوفر</th>
-                  <th id="thBookActions">حذف</th>
+                  <th id="thBookActions">إجراءات</th>
                 </tr>
               </thead>
               <tbody id="booksTableBody">
@@ -224,14 +224,15 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
       </div>
     </section>
 
-    <!-- ================= مودال: إضافة كتاب جديد ================= -->
+    <!-- ================= مودال: إضافة / تعديل كتاب ================= -->
     <div class="modal" id="addBookModal">
       <div class="modal-content admin-card">
         <div class="modal-header">
           <h3 id="addBookModalTitle">إضافة كتاب جديد</h3>
           <button type="button" onclick="closeAddBookModal()" class="modal-close" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="addBookForm" onsubmit="submitNewBook(event)">
+        <form id="addBookForm" onsubmit="handleBookSubmit(event)">
+          <input type="hidden" id="editingBookIdInput" value="">
           <div class="modal-body">
             <div class="form-group"><label id="lblBookTitleInput">عنوان الكتاب *</label><input id="bookTitleInput" required></div>
             <div class="form-row">
@@ -249,7 +250,7 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                   <option value="history">تاريخ وسير</option>
                 </select>
               </div>
-              <div class="form-group"><label id="lblBookLanguageInput">اللغة *</label>
+              <div class="form-group"><label id="lblBookLanguageInput">الغة *</label>
                 <select id="bookLanguageInput" required>
                   <option value="ar">العربية</option>
                   <option value="en">English</option>
@@ -257,7 +258,8 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
               </div>
             </div>
             <div class="form-group"><label id="lblBookDescInput">الوصف</label><textarea id="bookDescInput" rows="3"></textarea></div>
-            <div class="form-group"><label id="lblBookCoverUpload">صورة الغلاف (اختياري — تُرفع بالخلفية)</label>
+            <div class="form-group">
+              <label id="lblBookCoverUpload">صورة الغلاف</label>
               <div class="image-upload-wrapper" onclick="triggerFileInput()">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 <p id="uploadPromptText">اضغط لاختيار صورة — تُضغط تلقائياً للرفع السريع</p>
@@ -265,6 +267,7 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
                 <input type="file" id="bookCoverFile" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="previewImage(event)">
                 <img id="bookCoverPreview" class="image-preview" src="#" alt="" style="display:none;">
               </div>
+              <p id="currentCoverInfo" class="current-file-info" style="display:none;"></p>
             </div>
           </div>
           <div class="modal-footer">
@@ -273,6 +276,12 @@ SELECT id FROM auth.users WHERE email = 'بريدك@هنا.com';</pre>
           </div>
         </form>
       </div>
+    </div>
+
+    <!-- ================= Toast للإشعارات ================= -->
+    <div id="adminToast" class="admin-toast" hidden>
+      <span id="adminToastMessage"></span>
+      <button type="button" class="admin-toast-close" onclick="hideAdminToast()"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <!-- ================= مودال: إضافة محافظة ================= -->

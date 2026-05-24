@@ -42,7 +42,6 @@ const translations = {
         catChildren: "كتب أطفال",
         catScience: "علوم وتكنولوجيا",
         catHistory: "تاريخ وسير",
-        featuredBadge: "مميز",
         discountLabel: "خصم"
     },
     en: {
@@ -87,7 +86,6 @@ const translations = {
         catChildren: "Children's Books",
         catScience: "Science & Tech",
         catHistory: "History & Bio",
-        featuredBadge: "Featured",
         discountLabel: "Discount"
     }
 };
@@ -287,7 +285,7 @@ function renderBookDetails(book) {
                 const discount = parseInt(book.discount_percentage) || 0;
                 if (discount > 0) {
                     const fp = getFinalPrice(book);
-                    return `<div class="details-price"><span style="text-decoration:line-through;color:var(--ink-muted);font-size:18px;font-weight:600;margin-left:10px;">${book.price} ${t.currency}</span><span style="color:var(--danger);font-size:28px;">${fp.toFixed(2)}</span> <span>${t.currency}</span> <span class="details-discount-tag">-${discount}%</span></div>`;
+                    return `<div class="details-price"><span style="text-decoration:line-through;color:var(--ink-muted);font-size:18px;font-weight:600;margin-left:10px;">${book.price} ${t.currency}</span><span style="color:var(--danger);font-size:28px;">${fp.toFixed(2)}</span> <span>${t.currency}</span> <span class="details-discount-tag"><i class="fa-solid fa-tag"></i> ${t.discountLabel} ${discount}%</span></div>`;
                 }
                 return `<div class="details-price">${book.price} <span>${t.currency}</span></div>`;
             }()}

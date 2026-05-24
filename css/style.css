@@ -853,7 +853,7 @@ body.en-mode .wishlist-btn { right: auto; left: 14px; }
 /* Language Badge */
 .book-badge {
     position: absolute;
-    top: 14px;
+    top: 270px;
     left: 14px;
     padding: 4px 12px;
     font-size: 11px;
@@ -944,6 +944,34 @@ body.en-mode .book-card-title { font-family: var(--font-display-en); }
     font-family: var(--font-body-ar);
 }
 
+/* Discount ribbon badge */
+.discount-badge {
+    position: absolute;
+    top: 18px;
+    left: -38px;
+    z-index: 10;
+    width: 160px;
+    padding: 5px 0;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, var(--danger), #c0392b);
+    text-align: center;
+    transform: rotate(-45deg);
+    letter-spacing: 0.5px;
+    box-shadow: 0 3px 12px rgba(155,59,59,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    pointer-events: none;
+}
+body.en-mode .discount-badge {
+    left: auto;
+    right: -38px;
+    transform: rotate(45deg);
+}
+
 .add-cart-btn {
     width: 44px;
     height: 44px;
@@ -965,178 +993,12 @@ body.en-mode .book-card-title { font-family: var(--font-display-en); }
     box-shadow: var(--shadow-gold);
 }
 
-/* ═══════ FEATURED & DISCOUNT BADGES ═══════ */
-.featured-badge {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    z-index: 10;
-    padding: 4px 12px 4px 10px;
-    font-size: 11px;
-    font-weight: 800;
-    border-radius: var(--r-full);
-    background: linear-gradient(135deg, var(--gold), #a8881a);
-    color: var(--walnut-dark);
-    letter-spacing: 0.5px;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(197, 150, 58, 0.4);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-body.en-mode .featured-badge { left: 14px; right: auto; }
-
-.discount-badge {
-    position: absolute;
-    top: 56px;
-    left: 14px;
-    z-index: 10;
-    padding: 3px 10px;
-    font-size: 11px;
-    font-weight: 800;
-    border-radius: var(--r-full);
-    background: var(--danger);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(155, 59, 59, 0.3);
-}
-body.en-mode .discount-badge { left: 14px; right: auto; }
-
-/* Featured Book Card — larger, premium design */
-.book-card.featured {
-    grid-column: 1 / -1;
-    background: linear-gradient(135deg, var(--cream) 0%, #f5edd6 100%);
-    border: 2px solid rgba(197, 150, 58, 0.25);
-    box-shadow: 0 8px 40px rgba(197, 150, 58, 0.15), var(--shadow-lg);
-    border-radius: var(--r-xl);
-    overflow: hidden;
-}
-.book-card.featured::before {
-    background: radial-gradient(circle at top right, rgba(197, 150, 58, 0.18), transparent 40%);
-}
-.book-card.featured:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 16px 60px rgba(197, 150, 58, 0.2), 0 8px 30px rgba(62, 39, 35, 0.12);
-}
-
-.featured-ribbon {
-    position: absolute;
-    top: 0;
-    right: 30px;
-    z-index: 10;
-    background: linear-gradient(135deg, var(--gold), #d4a017);
-    color: var(--walnut-dark);
-    padding: 6px 20px;
-    font-size: 13px;
-    font-weight: 800;
-    border-radius: 0 0 var(--r-sm) var(--r-sm);
-    box-shadow: 0 4px 12px rgba(197, 150, 58, 0.3);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-body.en-mode .featured-ribbon { right: 30px; left: auto; }
-
-.featured-inner {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 0;
-    position: relative;
-}
-.featured-cover {
-    height: 380px;
-    background: linear-gradient(145deg, #E8DFD0, #D9CDB9);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    box-shadow: inset -6px 0 16px rgba(62, 39, 35, 0.06);
-}
-.featured-cover img {
-    height: 85%;
-    width: auto;
-    max-width: 75%;
-    object-fit: contain;
-    filter: drop-shadow(6px 12px 24px rgba(26, 18, 16, 0.35));
-    transition: var(--t-slow);
-}
-.book-card.featured:hover .featured-cover img {
-    transform: scale(1.05) translateY(-4px);
-    filter: drop-shadow(8px 16px 32px rgba(26, 18, 16, 0.4));
-}
-.featured-info {
-    padding: 30px 32px;
-    display: flex;
-    flex-direction: column;
-}
-.featured-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--walnut);
-    margin-bottom: 6px;
-    line-height: 1.3;
-    font-family: var(--font-display-ar);
-}
-body.en-mode .featured-title { font-family: var(--font-display-en); }
-.featured-author {
-    font-size: 15px;
-    color: var(--ink-muted);
-    margin-bottom: 16px;
-}
-.featured-desc {
-    font-size: 14px;
-    color: var(--ink-soft);
-    line-height: 1.7;
-    margin-bottom: 20px;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex-grow: 1;
-}
-.featured-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(197, 150, 58, 0.12);
-    margin-top: auto;
-}
-.featured-footer .book-card-price {
-    font-size: 22px;
-}
-
 /* Details page discount tag */
 .details-discount-tag {
-    display: inline-block;
-    padding: 3px 12px;
-    background: var(--danger);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 800;
-    border-radius: var(--r-full);
-    margin-right: 8px;
-    vertical-align: middle;
-}
-
-/* Responsive featured card */
-@media (max-width: 768px) {
-    .featured-inner {
-        grid-template-columns: 1fr;
-    }
-    .featured-cover {
-        height: 280px;
-    }
-    .featured-info {
-        padding: 20px;
-    }
-    .featured-title {
-        font-size: 20px;
-    }
-    .featured-footer {
-        flex-direction: column;
-        align-items: stretch;
-    }
+    display: inline-block; padding: 3px 12px;
+    background: var(--danger); color: #fff;
+    font-size: 13px; font-weight: 800;
+    border-radius: var(--r-full); margin-right: 8px; vertical-align: middle;
 }
 
 /* ═══════ BOOK DETAILS PAGE ═══════ */

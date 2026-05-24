@@ -153,14 +153,8 @@ const translations = {
         optModalCatScience: "علوم وتكنولوجيا",
         optModalCatHistory: "تاريخ وسير",
         lblBookDiscountInput: "نسبة الخصم (%)",
-        lblBookFeaturedInput: "كتاب مميز",
         thBookDiscount: "الخصم",
-        thBookFeatured: "مميز",
         btnPrintInvoiceText: "طباعة الفاتورة",
-        toggleFeatured: "تفعيل كمميز",
-        unfeatured: "إلغاء التميز",
-        featuredLabel: "مميز",
-        notFeatured: "عادي",
         discountLabel: "خصم",
         noDiscount: "بدون خصم",
         inStock: "متوفر",
@@ -330,14 +324,8 @@ const translations = {
         optModalCatScience: "Science & Tech",
         optModalCatHistory: "History & Bio",
         lblBookDiscountInput: "Discount (%)",
-        lblBookFeaturedInput: "Featured Book",
         thBookDiscount: "Discount",
-        thBookFeatured: "Featured",
         btnPrintInvoiceText: "Print Invoice",
-        toggleFeatured: "Set as Featured",
-        unfeatured: "Remove Featured",
-        featuredLabel: "Featured",
-        notFeatured: "Normal",
         discountLabel: "Discount",
         noDiscount: "No Discount",
         inStock: "In Stock",
@@ -628,9 +616,7 @@ function applyLanguage(lang) {
     
     // Book modal translations
     safeSetText("lblBookDiscountInput", t.lblBookDiscountInput);
-    safeSetText("lblBookFeaturedInput", t.lblBookFeaturedInput);
     safeSetText("thBookDiscount", t.thBookDiscount);
-    safeSetText("thBookFeatured", t.thBookFeatured);
     safeSetText("btnPrintInvoiceText", t.btnPrintInvoiceText);
 }
 
@@ -1313,11 +1299,6 @@ function renderBooksTable(booksToRender = currentBooks) {
             ? `<span style="color:var(--danger);font-weight:700;font-size:13px;">-${discount}%</span>` 
             : `<span style="color:var(--ink-muted);font-size:12px;">${t.noDiscount}</span>`;
         
-        const isFeatured = book.is_featured === true;
-        const featuredDisplay = `<button class="action-btn" style="color:${isFeatured ? 'var(--gold)' : 'var(--ink-muted)'};border:none;background:transparent;cursor:pointer;font-size:16px;" onclick="toggleFeatured('${book.id}', ${isFeatured})" title="${isFeatured ? t.unfeatured : t.toggleFeatured}">
-                <i class="fa-solid ${isFeatured ? 'fa-star' : 'fa-star'}"></i>
-            </button>`;
-        
         return `
         <tr>
             <td>${coverHtml}</td>
@@ -1327,7 +1308,6 @@ function renderBooksTable(booksToRender = currentBooks) {
             <td>${isAr ? t.arLangName : t.enLangName}</td>
             <td style="font-weight:800;">${book.price} ${t.currency}</td>
             <td style="text-align:center;">${discountDisplay}</td>
-            <td style="text-align:center;">${featuredDisplay}</td>
             <td>
                 <button class="status-badge" style="background:${inStockVal ? 'var(--success-light, #d4edda)' : 'var(--danger-light, #f8d7da)'}; color:${inStockVal ? 'var(--success)' : 'var(--danger)'}; cursor:pointer;" onclick="toggleBookStock('${book.id}', ${inStockVal})">
                     ${inStockVal ? t.inStock : t.outOfStock}
@@ -1362,23 +1342,6 @@ async function toggleBookStock(bookId, currentVal) {
     } catch (err) {
         const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
         console.error("[admin] toggleBookStock:", err);
-        showAdminDashboardAlert(msg, "error");
-    }
-}
-
-async function toggleFeatured(bookId, currentVal) {
-    const t = translations[currentLang];
-    try {
-        await adminRun("admin.books.featured", () =>
-            getSb().from("books").update({ is_featured: !currentVal }).eq("id", bookId)
-        );
-        const book = currentBooks.find(b => b.id === bookId);
-        if (book) book.is_featured = !currentVal;
-        filterBooks();
-        showAdminToast(currentVal ? t.unfeatured : t.toggleFeatured, "success");
-    } catch (err) {
-        const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
-        console.error("[admin] toggleFeatured:", err);
         showAdminDashboardAlert(msg, "error");
     }
 }
@@ -1456,7 +1419,6 @@ function openEditBookModal(bookId) {
     document.getElementById("bookLanguageInput").value = book.language || "ar";
     document.getElementById("bookDescInput").value = book.description || "";
     document.getElementById("bookDiscountInput").value = book.discount_percentage || 0;
-    document.getElementById("bookFeaturedInput").checked = book.is_featured === true;
 
     document.getElementById("bookCoverFile").required = false;
 
@@ -1546,7 +1508,6 @@ async function addBook() {
     const language = document.getElementById("bookLanguageInput").value;
     const description = document.getElementById("bookDescInput").value.trim();
     const discount = parseInt(document.getElementById("bookDiscountInput").value) || 0;
-    const isFeatured = document.getElementById("bookFeaturedInput").checked;
     const fileInput = document.getElementById("bookCoverFile");
     const rawFile = fileInput.files[0];
 
@@ -1562,7 +1523,7 @@ async function addBook() {
         const { data: inserted } = await adminRun("admin.books.insert", () =>
             getSb()
                 .from("books")
-                .insert([{ title, author, price, category, language, description, discount_percentage: discount, is_featured: isFeatured, image_url: null, in_stock: true }])
+                .insert([{ title, author, price, category, language, description, discount_percentage: discount, image_url: null, in_stock: true }])
                 .select()
                 .single()
         );
@@ -1613,7 +1574,6 @@ async function updateBook(bookId) {
     const language = document.getElementById("bookLanguageInput").value;
     const description = document.getElementById("bookDescInput").value.trim();
     const discount = parseInt(document.getElementById("bookDiscountInput").value) || 0;
-    const isFeatured = document.getElementById("bookFeaturedInput").checked;
     const fileInput = document.getElementById("bookCoverFile");
     const rawFile = fileInput.files[0];
 
@@ -1634,7 +1594,6 @@ async function updateBook(bookId) {
             language,
             description,
             discount_percentage: discount,
-            is_featured: isFeatured,
         };
 
         const { error: updateError } = await getSb()
@@ -1680,7 +1639,6 @@ async function updateBook(bookId) {
             updatedBook.language = language;
             updatedBook.description = description;
             updatedBook.discount_percentage = discount;
-            updatedBook.is_featured = isFeatured;
         }
 
         localStorage.setItem("dm_books_cache_time", "0");
@@ -1859,11 +1817,11 @@ async function deleteOrder() {
 async function loadDashboardStats() {
     const t = translations[currentLang];
     try {
-        // Total revenue from completed orders
+        // Total revenue from completed orders (book prices only, no shipping)
         const { data: revenueData } = await adminRun("admin.stats.revenue", () =>
-            getSb().from("orders").select("total_price").eq("status", "completed")
+            getSb().from("orders").select("total_price, shipping_cost").eq("status", "completed")
         );
-        const totalRevenue = (revenueData || []).reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        const totalRevenue = (revenueData || []).reduce((sum, o) => sum + (parseFloat(o.total_price || 0) - parseFloat(o.shipping_cost || 0)), 0);
         
         // Total orders
         const { count: totalOrders } = await adminRun("admin.stats.totalOrders", () =>

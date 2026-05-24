@@ -123,6 +123,46 @@ const translations = {
         
         arLangName: "العربية",
         enLangName: "الإنجليزية",
+        btnTabStatsText: "الإحصائيات",
+        statsPaneTitle: "لوحة الإحصائيات",
+        btnRefreshStats: "تحديث",
+        statLabelRevenue: "إجمالي الإيرادات",
+        statLabelTotalOrders: "إجمالي الطلبات",
+        statLabelCompletedOrders: "الطلبات المكتملة",
+        statLabelTotalBooks: "إجمالي الكتب",
+        statLabelBooksSold: "الكتب المباعة",
+        statLabelPendingOrders: "طلبات معلقة",
+        searchOrdersPlaceholder: "بحث باسم العميل أو الهاتف...",
+        searchBooksPlaceholder: "بحث عن كتاب أو كاتب...",
+        optStatusAll: "كل الحالات",
+        optStatusPending: "قيد الانتظار",
+        optStatusProcessing: "جاري التجهيز",
+        optStatusCompleted: "تم التوصيل",
+        optStatusCancelled: "ملغي",
+        optBookCatAll: "كل التصنيفات",
+        optBookCatNovels: "روايات",
+        optBookCatReligious: "كتب دينية",
+        optBookCatSelf: "تنمية بشرية",
+        optBookCatChildren: "كتب أطفال",
+        optBookCatScience: "علوم وتكنولوجيا",
+        optBookCatHistory: "تاريخ وسير",
+        optModalCatNovels: "روايات",
+        optModalCatReligious: "كتب دينية",
+        optModalCatSelf: "تنمية بشرية",
+        optModalCatChildren: "كتب أطفال",
+        optModalCatScience: "علوم وتكنولوجيا",
+        optModalCatHistory: "تاريخ وسير",
+        lblBookDiscountInput: "نسبة الخصم (%)",
+        lblBookFeaturedInput: "كتاب مميز",
+        thBookDiscount: "الخصم",
+        thBookFeatured: "مميز",
+        btnPrintInvoiceText: "طباعة الفاتورة",
+        toggleFeatured: "تفعيل كمميز",
+        unfeatured: "إلغاء التميز",
+        featuredLabel: "مميز",
+        notFeatured: "عادي",
+        discountLabel: "خصم",
+        noDiscount: "بدون خصم",
         inStock: "متوفر",
         outOfStock: "غير متوفر",
         
@@ -260,6 +300,46 @@ const translations = {
         
         arLangName: "Arabic",
         enLangName: "English",
+        btnTabStatsText: "Statistics",
+        statsPaneTitle: "Dashboard Statistics",
+        btnRefreshStats: "Refresh",
+        statLabelRevenue: "Total Revenue",
+        statLabelTotalOrders: "Total Orders",
+        statLabelCompletedOrders: "Completed Orders",
+        statLabelTotalBooks: "Total Books",
+        statLabelBooksSold: "Books Sold",
+        statLabelPendingOrders: "Pending Orders",
+        searchOrdersPlaceholder: "Search by customer name or phone...",
+        searchBooksPlaceholder: "Search by book title or author...",
+        optStatusAll: "All Statuses",
+        optStatusPending: "Pending",
+        optStatusProcessing: "Processing",
+        optStatusCompleted: "Completed",
+        optStatusCancelled: "Cancelled",
+        optBookCatAll: "All Categories",
+        optBookCatNovels: "Novels",
+        optBookCatReligious: "Religious",
+        optBookCatSelf: "Self-Development",
+        optBookCatChildren: "Children's Books",
+        optBookCatScience: "Science & Tech",
+        optBookCatHistory: "History & Bio",
+        optModalCatNovels: "Novels",
+        optModalCatReligious: "Religious",
+        optModalCatSelf: "Self-Development",
+        optModalCatChildren: "Children's Books",
+        optModalCatScience: "Science & Tech",
+        optModalCatHistory: "History & Bio",
+        lblBookDiscountInput: "Discount (%)",
+        lblBookFeaturedInput: "Featured Book",
+        thBookDiscount: "Discount",
+        thBookFeatured: "Featured",
+        btnPrintInvoiceText: "Print Invoice",
+        toggleFeatured: "Set as Featured",
+        unfeatured: "Remove Featured",
+        featuredLabel: "Featured",
+        notFeatured: "Normal",
+        discountLabel: "Discount",
+        noDiscount: "No Discount",
         inStock: "In Stock",
         outOfStock: "Out of Stock",
         
@@ -396,6 +476,11 @@ function applyLanguage(lang) {
         if (el) el.innerHTML = text;
     };
 
+    const safeSetPlaceholder = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.placeholder = text;
+    };
+
     safeSetText("navHome", t.navHome);
     safeSetText("navCatalog", t.navCatalog);
     safeSetText("navAdmin", t.navAdmin);
@@ -496,6 +581,57 @@ function applyLanguage(lang) {
         catSelect.options[4].text = t.catScience;
         catSelect.options[5].text = t.catHistory;
     }
+    
+    // Translate order status filter
+    const statusFilter = document.getElementById("filterOrderStatus");
+    if (statusFilter) {
+        const statusOptions = ["all", "pending", "processing", "completed", "cancelled"];
+        const statusOptIds = ["optStatusAll", "optStatusPending", "optStatusProcessing", "optStatusCompleted", "optStatusCancelled"];
+        statusOptions.forEach((val, i) => {
+            const opt = statusFilter.querySelector(`option[value="${val}"]`);
+            if (opt) opt.textContent = t[statusOptIds[i]];
+        });
+    }
+    
+    // Translate book category filter
+    const bookCatFilter = document.getElementById("filterBookCategory");
+    if (bookCatFilter) {
+        const catOptIds = ["optBookCatAll", "optBookCatNovels", "optBookCatReligious", "optBookCatSelf", "optBookCatChildren", "optBookCatScience", "optBookCatHistory"];
+        bookCatFilter.querySelectorAll("option").forEach((opt, i) => {
+            if (opt && catOptIds[i]) opt.textContent = t[catOptIds[i]];
+        });
+    }
+    
+    // Translate modal category select
+    const modalCatSelect = document.getElementById("bookCategoryInput");
+    if (modalCatSelect) {
+        const modalCatOptIds = ["optModalCatNovels", "optModalCatReligious", "optModalCatSelf", "optModalCatChildren", "optModalCatScience", "optModalCatHistory"];
+        modalCatSelect.querySelectorAll("option").forEach((opt, i) => {
+            if (opt && modalCatOptIds[i]) opt.textContent = t[modalCatOptIds[i]];
+        });
+    }
+    
+    // Translate search placeholders
+    safeSetPlaceholder("searchOrdersInput", t.searchOrdersPlaceholder);
+    safeSetPlaceholder("searchBooksInput", t.searchBooksPlaceholder);
+    
+    // Stats tab translations
+    safeSetText("btnTabStatsText", t.btnTabStatsText);
+    safeSetText("statsPaneTitle", t.statsPaneTitle);
+    safeSetText("btnRefreshStats", t.btnRefreshStats);
+    safeSetText("statLabelRevenue", t.statLabelRevenue);
+    safeSetText("statLabelTotalOrders", t.statLabelTotalOrders);
+    safeSetText("statLabelCompletedOrders", t.statLabelCompletedOrders);
+    safeSetText("statLabelTotalBooks", t.statLabelTotalBooks);
+    safeSetText("statLabelBooksSold", t.statLabelBooksSold);
+    safeSetText("statLabelPendingOrders", t.statLabelPendingOrders);
+    
+    // Book modal translations
+    safeSetText("lblBookDiscountInput", t.lblBookDiscountInput);
+    safeSetText("lblBookFeaturedInput", t.lblBookFeaturedInput);
+    safeSetText("thBookDiscount", t.thBookDiscount);
+    safeSetText("thBookFeatured", t.thBookFeatured);
+    safeSetText("btnPrintInvoiceText", t.btnPrintInvoiceText);
 }
 
 async function checkAuthSession() {
@@ -658,13 +794,16 @@ function switchTab(tab) {
     document.getElementById("tabBtnOrders").classList.toggle("active", tab === "orders");
     document.getElementById("tabBtnBooks").classList.toggle("active", tab === "books");
     document.getElementById("tabBtnGovernorates").classList.toggle("active", tab === "governorates");
+    document.getElementById("tabBtnStats").classList.toggle("active", tab === "stats");
     document.getElementById("paneOrders").style.display = tab === "orders" ? "block" : "none";
     document.getElementById("paneBooks").style.display = tab === "books" ? "block" : "none";
     document.getElementById("paneGovernorates").style.display = tab === "governorates" ? "block" : "none";
+    document.getElementById("paneStats").style.display = tab === "stats" ? "block" : "none";
     
     if (tab === "orders") loadOrders();
     else if (tab === "books") loadBooks();
     else if (tab === "governorates") loadGovernorates();
+    else if (tab === "stats") loadDashboardStats();
 }
 
 // ---------------------------
@@ -1147,7 +1286,7 @@ function renderBooksTable(booksToRender = currentBooks) {
     const t = translations[currentLang];
     
     if (booksToRender.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-light); padding:20px;">${t.noSearchResults}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-light); padding:20px;">${t.noSearchResults}</td></tr>`;
         return;
     }
     
@@ -1169,6 +1308,16 @@ function renderBooksTable(booksToRender = currentBooks) {
         
         const categoryLabel = t["cat" + book.category.charAt(0).toUpperCase() + book.category.slice(1).replace("-", "")] || book.category;
         
+        const discount = parseInt(book.discount_percentage) || 0;
+        const discountDisplay = discount > 0 
+            ? `<span style="color:var(--danger);font-weight:700;font-size:13px;">-${discount}%</span>` 
+            : `<span style="color:var(--ink-muted);font-size:12px;">${t.noDiscount}</span>`;
+        
+        const isFeatured = book.is_featured === true;
+        const featuredDisplay = `<button class="action-btn" style="color:${isFeatured ? 'var(--gold)' : 'var(--ink-muted)'};border:none;background:transparent;cursor:pointer;font-size:16px;" onclick="toggleFeatured('${book.id}', ${isFeatured})" title="${isFeatured ? t.unfeatured : t.toggleFeatured}">
+                <i class="fa-solid ${isFeatured ? 'fa-star' : 'fa-star'}"></i>
+            </button>`;
+        
         return `
         <tr>
             <td>${coverHtml}</td>
@@ -1177,6 +1326,8 @@ function renderBooksTable(booksToRender = currentBooks) {
             <td>${categoryLabel}</td>
             <td>${isAr ? t.arLangName : t.enLangName}</td>
             <td style="font-weight:800;">${book.price} ${t.currency}</td>
+            <td style="text-align:center;">${discountDisplay}</td>
+            <td style="text-align:center;">${featuredDisplay}</td>
             <td>
                 <button class="status-badge" style="background:${inStockVal ? 'var(--success-light, #d4edda)' : 'var(--danger-light, #f8d7da)'}; color:${inStockVal ? 'var(--success)' : 'var(--danger)'}; cursor:pointer;" onclick="toggleBookStock('${book.id}', ${inStockVal})">
                     ${inStockVal ? t.inStock : t.outOfStock}
@@ -1211,6 +1362,23 @@ async function toggleBookStock(bookId, currentVal) {
     } catch (err) {
         const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
         console.error("[admin] toggleBookStock:", err);
+        showAdminDashboardAlert(msg, "error");
+    }
+}
+
+async function toggleFeatured(bookId, currentVal) {
+    const t = translations[currentLang];
+    try {
+        await adminRun("admin.books.featured", () =>
+            getSb().from("books").update({ is_featured: !currentVal }).eq("id", bookId)
+        );
+        const book = currentBooks.find(b => b.id === bookId);
+        if (book) book.is_featured = !currentVal;
+        filterBooks();
+        showAdminToast(currentVal ? t.unfeatured : t.toggleFeatured, "success");
+    } catch (err) {
+        const msg = window.dmApiGuard?.normalizeError?.(err)?.message || "Error";
+        console.error("[admin] toggleFeatured:", err);
         showAdminDashboardAlert(msg, "error");
     }
 }
@@ -1287,6 +1455,8 @@ function openEditBookModal(bookId) {
     document.getElementById("bookCategoryInput").value = book.category || "novels";
     document.getElementById("bookLanguageInput").value = book.language || "ar";
     document.getElementById("bookDescInput").value = book.description || "";
+    document.getElementById("bookDiscountInput").value = book.discount_percentage || 0;
+    document.getElementById("bookFeaturedInput").checked = book.is_featured === true;
 
     document.getElementById("bookCoverFile").required = false;
 
@@ -1375,6 +1545,8 @@ async function addBook() {
     const category = document.getElementById("bookCategoryInput").value;
     const language = document.getElementById("bookLanguageInput").value;
     const description = document.getElementById("bookDescInput").value.trim();
+    const discount = parseInt(document.getElementById("bookDiscountInput").value) || 0;
+    const isFeatured = document.getElementById("bookFeaturedInput").checked;
     const fileInput = document.getElementById("bookCoverFile");
     const rawFile = fileInput.files[0];
 
@@ -1390,7 +1562,7 @@ async function addBook() {
         const { data: inserted } = await adminRun("admin.books.insert", () =>
             getSb()
                 .from("books")
-                .insert([{ title, author, price, category, language, description, image_url: null, in_stock: true }])
+                .insert([{ title, author, price, category, language, description, discount_percentage: discount, is_featured: isFeatured, image_url: null, in_stock: true }])
                 .select()
                 .single()
         );
@@ -1440,6 +1612,8 @@ async function updateBook(bookId) {
     const category = document.getElementById("bookCategoryInput").value;
     const language = document.getElementById("bookLanguageInput").value;
     const description = document.getElementById("bookDescInput").value.trim();
+    const discount = parseInt(document.getElementById("bookDiscountInput").value) || 0;
+    const isFeatured = document.getElementById("bookFeaturedInput").checked;
     const fileInput = document.getElementById("bookCoverFile");
     const rawFile = fileInput.files[0];
 
@@ -1459,6 +1633,8 @@ async function updateBook(bookId) {
             category,
             language,
             description,
+            discount_percentage: discount,
+            is_featured: isFeatured,
         };
 
         const { error: updateError } = await getSb()
@@ -1503,6 +1679,8 @@ async function updateBook(bookId) {
             updatedBook.category = category;
             updatedBook.language = language;
             updatedBook.description = description;
+            updatedBook.discount_percentage = discount;
+            updatedBook.is_featured = isFeatured;
         }
 
         localStorage.setItem("dm_books_cache_time", "0");
@@ -1675,6 +1853,202 @@ async function deleteOrder() {
     } catch (err) {
         console.error("[admin] deleteOrder:", err);
         alert(window.dmApiGuard?.normalizeError?.(err)?.message || "Error");
+    }
+}
+
+async function loadDashboardStats() {
+    const t = translations[currentLang];
+    try {
+        // Total revenue from completed orders
+        const { data: revenueData } = await adminRun("admin.stats.revenue", () =>
+            getSb().from("orders").select("total_price").eq("status", "completed")
+        );
+        const totalRevenue = (revenueData || []).reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
+        
+        // Total orders
+        const { count: totalOrders } = await adminRun("admin.stats.totalOrders", () =>
+            getSb().from("orders").select("*", { count: "exact", head: true })
+        );
+        
+        // Completed orders
+        const { count: completedOrders } = await adminRun("admin.stats.completedOrders", () =>
+            getSb().from("orders").select("*", { count: "exact", head: true }).eq("status", "completed")
+        );
+        
+        // Pending orders
+        const { count: pendingOrders } = await adminRun("admin.stats.pendingOrders", () =>
+            getSb().from("orders").select("*", { count: "exact", head: true }).eq("status", "pending")
+        );
+        
+        // Total books in DB
+        const { count: totalBooks } = await adminRun("admin.stats.totalBooks", () =>
+            getSb().from("books").select("*", { count: "exact", head: true })
+        );
+        
+        // Books sold (sum of quantities in order_items)
+        const { data: soldData } = await adminRun("admin.stats.booksSold", () =>
+            getSb().from("order_items").select("quantity")
+        );
+        const booksSold = (soldData || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+        
+        // Update UI
+        document.getElementById("statTotalRevenue").innerHTML = `${totalRevenue.toFixed(2)} <span>${t.currency}</span>`;
+        document.getElementById("statTotalOrders").innerText = totalOrders || 0;
+        document.getElementById("statCompletedOrders").innerText = completedOrders || 0;
+        document.getElementById("statPendingOrders").innerText = pendingOrders || 0;
+        document.getElementById("statTotalBooks").innerText = totalBooks || 0;
+        document.getElementById("statBooksSold").innerText = booksSold;
+        
+        const now = new Date().toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", {
+            year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+        });
+        document.getElementById("statsLastUpdate").innerText = `${currentLang === "ar" ? "آخر تحديث:" : "Last updated:"} ${now}`;
+    } catch (err) {
+        const normalized = window.dmApiGuard?.normalizeError ? window.dmApiGuard.normalizeError(err) : err;
+        console.error("[admin] loadDashboardStats:", normalized);
+        showAdminDashboardAlert(normalized.message || "Error loading stats", "error");
+    }
+}
+
+function printInvoice() {
+    if (!selectedOrderId) return;
+    const t = translations[currentLang];
+    const order = currentOrders.find(o => o.id === selectedOrderId);
+    if (!order) return;
+    
+    const orderDate = new Date(order.created_at).toLocaleDateString(currentLang === "ar" ? "ar-EG" : "en-US", {
+        year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+    
+    let statusText = t.statusPending;
+    if (order.status === "processing") statusText = t.statusProcessing;
+    else if (order.status === "completed") statusText = t.statusCompleted;
+    else if (order.status === "cancelled") statusText = t.statusCancelled;
+    
+    // Grab items from the order details modal
+    const itemsBody = document.getElementById("detOrderItemsBody");
+    let itemsHtml = "";
+    let itemsSubtotal = 0;
+    
+    if (itemsBody) {
+        const rows = itemsBody.querySelectorAll("tr");
+        rows.forEach((row, index) => {
+            const cells = row.querySelectorAll("td");
+            if (cells.length >= 4) {
+                const bookTitle = cells[0].textContent;
+                const qty = cells[1].textContent;
+                const unitPrice = cells[2].textContent;
+                const subtotal = cells[3].textContent;
+                itemsSubtotal += parseFloat(subtotal.replace(/[^0-9.-]/g, '')) || 0;
+                itemsHtml += `<tr><td>${index + 1}</td><td>${bookTitle}</td><td style="text-align:center;">${qty}</td><td style="text-align:center;">${unitPrice}</td><td style="text-align:center;">${subtotal}</td></tr>`;
+            }
+        });
+    }
+    
+    const shipping = parseFloat(order.shipping_cost) || 0;
+    const total = parseFloat(order.total_price) || 0;
+    
+    const invoiceHtml = `
+    <!DOCTYPE html>
+    <html dir="${document.documentElement.dir}">
+    <head>
+        <meta charset="UTF-8">
+        <title>فاتورة - ${order.id.substring(0, 8)}</title>
+        <style>
+            @page { margin: 15mm; size: A4; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: 'Tajawal', 'Segoe UI', Arial, sans-serif; color: #1a1a1a; background: #fff; padding: 20px; direction: ${document.documentElement.dir}; }
+            .invoice-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #C5A021; padding-bottom: 20px; margin-bottom: 25px; }
+            .invoice-logo { display: flex; align-items: center; gap: 12px; }
+            .invoice-logo img { width: 50px; height: 50px; }
+            .invoice-logo h1 { font-size: 24px; color: #1B3022; }
+            .invoice-logo h1 span { color: #C5A021; }
+            .invoice-title { font-size: 20px; font-weight: 800; color: #1B3022; background: #F5F1E6; padding: 8px 20px; border-radius: 8px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+            .info-box { background: #f8f6f0; padding: 15px; border-radius: 10px; }
+            .info-box h3 { font-size: 14px; color: #C5A021; margin-bottom: 8px; font-weight: 700; }
+            .info-box p { font-size: 13px; color: #333; margin-bottom: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+            th { background: #1B3022; color: #fff; padding: 12px 15px; font-size: 13px; font-weight: 700; text-align: ${document.documentElement.dir === 'rtl' ? 'right' : 'left'}; }
+            td { padding: 10px 15px; border-bottom: 1px solid #e0dcd0; font-size: 13px; }
+            tr:nth-child(even) { background: #faf8f2; }
+            .totals { ${document.documentElement.dir === 'rtl' ? 'text-align: left;' : 'text-align: right;'} margin-top: 10px; }
+            .totals div { margin-bottom: 6px; font-size: 14px; }
+            .totals .grand-total { font-size: 20px; font-weight: 800; color: #1B3022; border-top: 2px solid #C5A021; padding-top: 10px; margin-top: 10px; }
+            .footer-note { text-align: center; color: #888; font-size: 12px; margin-top: 40px; border-top: 1px solid #e0dcd0; padding-top: 20px; }
+            .status-badge-inv { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; background: #EEF7F0; color: #3B7A45; }
+            @media print { body { padding: 0; } .no-print { display: none; } }
+        </style>
+    </head>
+    <body>
+        <div class="invoice-header">
+            <div class="invoice-logo">
+                <img src="assets/logo.png" alt="dm">
+                <h1>dm<span>.</span></h1>
+            </div>
+            <div class="invoice-title">${currentLang === "ar" ? "فاتورة شراء" : "INVOICE"}</div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-box">
+                <h3>${currentLang === "ar" ? "بيانات العميل" : "Customer Info"}</h3>
+                <p><strong>${t.lblDetName.replace(':', '')}:</strong> ${order.customer_name}</p>
+                <p><strong>${t.lblDetPhone.replace(':', '')}:</strong> ${order.customer_phone}</p>
+                <p><strong>${t.lblDetGov.replace(':', '')}:</strong> ${order.governorate}</p>
+                <p><strong>${t.lblDetAddress.replace(':', '')}:</strong> ${order.address}</p>
+                ${order.notes ? `<p><strong>${t.lblDetNotes.replace(':', '')}:</strong> ${order.notes}</p>` : ''}
+            </div>
+            <div class="info-box">
+                <h3>${currentLang === "ar" ? "معلومات الفاتورة" : "Invoice Info"}</h3>
+                <p><strong>${currentLang === "ar" ? "رقم الطلب:" : "Order ID:"}</strong> ${order.id}</p>
+                <p><strong>${currentLang === "ar" ? "التاريخ:" : "Date:"}</strong> ${orderDate}</p>
+                <p><strong>${currentLang === "ar" ? "الحالة:" : "Status:"}</strong> <span class="status-badge-inv">${statusText}</span></p>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>${t.thDetBookTitle}</th>
+                    <th style="text-align:center;">${t.thDetQty}</th>
+                    <th style="text-align:center;">${t.thDetUnitPrice}</th>
+                    <th style="text-align:center;">${t.thDetSubtotal}</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itemsHtml || `<tr><td colspan="5" style="text-align:center;">${currentLang === "ar" ? "لا توجد عناصر" : "No items"}</td></tr>`}
+            </tbody>
+        </table>
+        
+        <div class="totals">
+            <div><strong>${t.lblDetSubtotalPrice}</strong> ${itemsSubtotal.toFixed(2)} ${t.currency}</div>
+            <div><strong>${t.lblDetShippingPrice}</strong> ${shipping.toFixed(2)} ${t.currency}</div>
+            <div class="grand-total"><strong>${t.lblDetTotalPrice}</strong> ${total.toFixed(2)} ${t.currency}</div>
+        </div>
+        
+        <div class="footer-note">
+            ${currentLang === "ar" ? "شكراً لتسوقك من dm bookstore" : "Thank you for shopping at dm bookstore"}
+            <br>
+            ${currentLang === "ar" ? "الدفع عند الاستلام" : "Cash on Delivery"}
+        </div>
+        
+        <div style="text-align:center;margin-top:20px;">
+            <button class="no-print" onclick="window.print()" style="padding:10px 30px;background:#1B3022;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:15px;">
+                <i class="fa-solid fa-print"></i> ${currentLang === "ar" ? "طباعة" : "Print"}
+            </button>
+        </div>
+    </body>
+    </html>`;
+    
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (printWindow) {
+        printWindow.document.write(invoiceHtml);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
+    } else {
+        alert(currentLang === "ar" ? "يرجى السماح للنوافذ المنبثقة لطباعة الفاتورة" : "Please allow pop-ups to print the invoice");
     }
 }
 

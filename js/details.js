@@ -41,7 +41,9 @@ const translations = {
         catSelfDevelopment: "تنمية بشرية",
         catChildren: "كتب أطفال",
         catScience: "علوم وتكنولوجيا",
-        catHistory: "تاريخ وسير"
+        catHistory: "تاريخ وسير",
+        featuredBadge: "مميز",
+        discountLabel: "خصم"
     },
     en: {
         pageTitle: "dm | Book Details",
@@ -84,9 +86,18 @@ const translations = {
         catSelfDevelopment: "Self-Development",
         catChildren: "Children's Books",
         catScience: "Science & Tech",
-        catHistory: "History & Bio"
+        catHistory: "History & Bio",
+        featuredBadge: "Featured",
+        discountLabel: "Discount"
     }
 };
+
+function getFinalPrice(book) {
+    const price = parseFloat(book.price) || 0;
+    const discount = parseInt(book.discount_percentage) || 0;
+    if (discount > 0) return price * (1 - discount / 100);
+    return price;
+}
 
 let currentLang = localStorage.getItem("lang") || "ar";
 let bookId = "";
@@ -272,7 +283,14 @@ function renderBookDetails(book) {
             
             <div class="details-divider"></div>
             
-            <div class="details-price">${book.price} <span>${t.currency}</span></div>
+            ${function() {
+                const discount = parseInt(book.discount_percentage) || 0;
+                if (discount > 0) {
+                    const fp = getFinalPrice(book);
+                    return `<div class="details-price"><span style="text-decoration:line-through;color:var(--ink-muted);font-size:18px;font-weight:600;margin-left:10px;">${book.price} ${t.currency}</span><span style="color:var(--danger);font-size:28px;">${fp.toFixed(2)}</span> <span>${t.currency}</span> <span class="details-discount-tag">-${discount}%</span></div>`;
+                }
+                return `<div class="details-price">${book.price} <span>${t.currency}</span></div>`;
+            }()}
             
             <h3 class="details-desc-title">${t.detailsDescTitle}</h3>
             <p class="details-desc">${book.description || (currentLang === "ar" ? "لا يوجد وصف متوفر لهذا الكتاب حالياً." : "No description available for this book.")}</p>
@@ -325,6 +343,8 @@ function updateChosenQty(delta) {
 function buyBook() {
     if (!currentBook) return;
     
+    const finalPrice = getFinalPrice(currentBook);
+    
     const existing = cart.find(item => item.id === currentBook.id);
     if (existing) {
         existing.quantity += chosenQty;
@@ -334,7 +354,9 @@ function buyBook() {
             quantity: chosenQty,
             title: currentBook.title,
             author: currentBook.author,
-            price: currentBook.price,
+            price: finalPrice,
+            originalPrice: currentBook.price,
+            discount_percentage: currentBook.discount_percentage || 0,
             image_url: currentBook.image_url
         });
     }

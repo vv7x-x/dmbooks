@@ -52,7 +52,10 @@ const translations = {
         langLabel: "اللغة: ",
         authorLabel: "الكاتب: ",
         arLangName: "العربية",
-        enLangName: "الإنجليزية"
+        enLangName: "الإنجليزية",
+        featuredBadge: "مميز",
+        discountLabel: "خصم",
+        featuredTitle: "كتاب مميز"
     },
     en: {
         pageTitle: "dm | The Premier Bookstore",
@@ -106,7 +109,10 @@ const translations = {
         langLabel: "Language: ",
         authorLabel: "Author: ",
         arLangName: "Arabic",
-        enLangName: "English"
+        enLangName: "English",
+        featuredBadge: "Featured",
+        discountLabel: "Discount",
+        featuredTitle: "Featured Book"
     }
 };
 
@@ -141,6 +147,15 @@ function escapeHtml(str) {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/"/g, "&quot;");
+}
+
+function getFinalPrice(book) {
+    const price = parseFloat(book.price) || 0;
+    const discount = parseInt(book.discount_percentage) || 0;
+    if (discount > 0) {
+        return price * (1 - discount / 100);
+    }
+    return price;
 }
 
 function debounce(fn, ms) {
@@ -416,12 +431,19 @@ function getFilteredBooks() {
     });
 
     if (sortVal === "price-low") {
-        filtered.sort((a, b) => Number(a.price) - Number(b.price));
+        filtered.sort((a, b) => getFinalPrice(a) - getFinalPrice(b));
     } else if (sortVal === "price-high") {
-        filtered.sort((a, b) => Number(b.price) - Number(a.price));
+        filtered.sort((a, b) => getFinalPrice(b) - getFinalPrice(a));
     } else {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
+
+    // Featured books always come first
+    filtered.sort((a, b) => {
+        const aF = a.is_featured === true ? 1 : 0;
+        const bF = b.is_featured === true ? 1 : 0;
+        return bF - aF;
+    });
 
     return filtered;
 }
@@ -433,6 +455,9 @@ function buildBookCardHtml(book, t) {
     const bookId = escapeHtml(book.id);
     const title = escapeHtml(book.title);
     const author = escapeHtml(book.author);
+    const discount = parseInt(book.discount_percentage) || 0;
+    const finalPrice = getFinalPrice(book);
+    const isFeatured = book.is_featured === true;
 
     let coverImgHtml = "";
     if (book.image_url) {
@@ -456,8 +481,29 @@ function buildBookCardHtml(book, t) {
     const catKey = CATEGORY_LABEL_KEYS[book.category];
     const categoryLabel = catKey ? t[catKey] : escapeHtml(book.category);
 
+    // Price display with discount
+    let priceHtml = "";
+    if (discount > 0) {
+        priceHtml = `
+            <div class="book-card-price">
+                <span style="text-decoration:line-through;color:var(--ink-muted);font-size:14px;font-weight:600;">${book.price} ${t.currency}</span>
+                <span style="color:var(--danger);font-weight:800;font-size:20px;margin-right:4px;">${finalPrice.toFixed(2)}</span>
+                <span style="font-size:12px;font-weight:600;color:var(--ink-muted);">${t.currency}</span>
+            </div>`;
+    } else {
+        priceHtml = `<div class="book-card-price">${book.price} <span>${t.currency}</span></div>`;
+    }
+
+    // Featured badge
+    const featuredBadge = isFeatured ? `<span class="featured-badge"><i class="fa-solid fa-star"></i> ${t.featuredBadge}</span>` : "";
+
+    // Discount badge
+    const discountBadge = discount > 0 ? `<span class="discount-badge">-${discount}%</span>` : "";
+
     return `
-        <div class="book-card">
+        <div class="book-card ${isFeatured ? "featured" : ""}">
+            ${featuredBadge}
+            ${discountBadge}
             <button class="wishlist-btn ${inWishlist ? "active" : ""}" onclick="toggleWishlistItem('${bookId}')" title="${escapeHtml(t.wishlistDrawerTitle)}">
                 <i class="${inWishlist ? "fa-solid" : "fa-regular"} fa-heart"></i>
             </button>
@@ -470,32 +516,102 @@ function buildBookCardHtml(book, t) {
                 <a href="book-details.html?id=${bookId}"><h3 class="book-card-title">${title}</h3></a>
                 <p class="book-card-author">${t.authorLabel}${author}</p>
                 <div class="book-card-footer">
-                    <div class="book-card-price">${book.price} <span>${t.currency}</span></div>
+                    ${priceHtml}
                     ${isOutOfStock ? "" : `<button class="add-cart-btn" onclick="addToCart('${bookId}')" title="${escapeHtml(t.addToCart)}"><i class="fa-solid fa-cart-plus"></i></button>`}
                 </div>
             </div>
         </div>`;
 }
 
+function buildFeaturedBookCardHtml(book, t) {
+    const inWishlist = wishlist.some((item) => item.id === book.id);
+    const isAr = book.language === "ar";
+    const isOutOfStock = book.in_stock === false;
+    const bookId = escapeHtml(book.id);
+    const title = escapeHtml(book.title);
+    const author = escapeHtml(book.author);
+    const discount = parseInt(book.discount_percentage) || 0;
+    const finalPrice = getFinalPrice(book);
+    const desc = escapeHtml((book.description || "").substring(0, 120));
+
+    let coverImgHtml = "";
+    if (book.image_url) {
+        const src = window.dmBooks
+            ? window.dmBooks.bookCoverUrl(book.image_url, 400)
+            : book.image_url;
+        coverImgHtml = `<img src="${escapeHtml(src)}" alt="${title}" width="360" height="520" loading="lazy" decoding="async" onerror="this.classList.add('book-img-broken');this.style.visibility='hidden';this.parentElement?.classList.add('book-card-img--no-photo');">`;
+    } else {
+        coverImgHtml = `<div style="width:100%;height:100%;background:linear-gradient(135deg,var(--forest-light),var(--forest));display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px;color:#fff;text-align:center;">
+            <div style="width:30px;height:2px;background:var(--gold);margin-bottom:12px;"></div>
+            <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${title}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);">${author}</div>
+        </div>`;
+    }
+
+    const catKey = CATEGORY_LABEL_KEYS[book.category];
+    const categoryLabel = catKey ? t[catKey] : escapeHtml(book.category);
+
+    let priceHtml = "";
+    if (discount > 0) {
+        priceHtml = `<div class="book-card-price">
+            <span style="text-decoration:line-through;color:var(--ink-muted);font-size:14px;">${book.price} ${t.currency}</span>
+            <span style="color:var(--danger);font-weight:800;font-size:22px;margin:0 4px;">${finalPrice.toFixed(2)}</span>
+            <span style="font-size:13px;">${t.currency}</span>
+        </div>`;
+    } else {
+        priceHtml = `<div class="book-card-price">${book.price} <span>${t.currency}</span></div>`;
+    }
+
+    return `
+    <div class="book-card featured">
+        <div class="featured-ribbon"><i class="fa-solid fa-star"></i> ${t.featuredBadge}</div>
+        ${discount > 0 ? `<span class="discount-badge" style="top:60px;">-${discount}%</span>` : ""}
+        <button class="wishlist-btn ${inWishlist ? "active" : ""}" onclick="toggleWishlistItem('${bookId}')" title="${escapeHtml(t.wishlistDrawerTitle)}">
+            <i class="${inWishlist ? "fa-solid" : "fa-regular"} fa-heart"></i>
+        </button>
+        <div class="featured-inner">
+            <a href="book-details.html?id=${bookId}" class="featured-cover">${coverImgHtml}</a>
+            <div class="featured-info">
+                <span class="book-card-category" style="font-size:12px;">${categoryLabel}</span>
+                <a href="book-details.html?id=${bookId}"><h3 class="featured-title">${title}</h3></a>
+                <p class="featured-author">${t.authorLabel}${author}</p>
+                ${desc ? `<p class="featured-desc">${desc}...</p>` : ""}
+                <div class="featured-footer">
+                    ${priceHtml}
+                    ${isOutOfStock ? `<span class="status-badge badge-out-of-stock">${t.outOfStock}</span>` : `<button class="btn btn-primary" onclick="addToCart('${bookId}')" style="padding:10px 24px;font-size:14px;border-radius:var(--r-md);"><i class="fa-solid fa-cart-plus"></i> ${t.addToCart}</button>`}
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
 function renderBooksGridChunked(grid, books, t, token) {
     buildBookCardHtml.eagerCount = 0;
-    if (books.length <= BOOK_RENDER_BATCH) {
-        grid.innerHTML = books.map((book) => buildBookCardHtml(book, t)).join("");
+    const featuredBooks = books.filter(b => b.is_featured === true);
+    const normalBooks = books.filter(b => b.is_featured !== true);
+    
+    // Render featured books first (they are few), then chunk normal books
+    let featuredHtml = "";
+    featuredBooks.forEach(book => { featuredHtml += buildFeaturedBookCardHtml(book, t); });
+    
+    if (normalBooks.length === 0) {
+        grid.innerHTML = featuredHtml;
         grid.classList.add("books-grid-fade-in");
         return;
     }
-    grid.innerHTML = "";
+    
+    grid.innerHTML = featuredHtml;
     let index = 0;
     function appendBatch() {
         if (token !== renderGridToken) return;
-        const slice = books.slice(index, index + BOOK_RENDER_BATCH);
+        const slice = normalBooks.slice(index, index + BOOK_RENDER_BATCH);
         if (!slice.length) {
             grid.classList.add("books-grid-fade-in");
             return;
         }
         grid.insertAdjacentHTML("beforeend", slice.map((book) => buildBookCardHtml(book, t)).join(""));
         index += BOOK_RENDER_BATCH;
-        if (index < books.length) requestAnimationFrame(appendBatch);
+        if (index < normalBooks.length) requestAnimationFrame(appendBatch);
         else grid.classList.add("books-grid-fade-in");
     }
     requestAnimationFrame(appendBatch);
@@ -540,7 +656,15 @@ function renderBooksGrid() {
         return;
     }
 
-    grid.innerHTML = filtered.map((book) => buildBookCardHtml(book, t)).join("");
+    const featuredBooks = filtered.filter(b => b.is_featured === true);
+    const normalBooks = filtered.filter(b => b.is_featured !== true);
+
+    let allHtml = "";
+    featuredBooks.forEach(book => {
+        allHtml += buildFeaturedBookCardHtml(book, t);
+    });
+    allHtml += normalBooks.map(book => buildBookCardHtml(book, t)).join("");
+    grid.innerHTML = allHtml;
     grid.classList.add("books-grid-fade-in");
 }
 
@@ -565,6 +689,8 @@ function addToCart(bookId) {
     const book = allBooks.find(b => b.id === bookId);
     if (!book) return;
     
+    const finalPrice = getFinalPrice(book);
+    
     const existing = cart.find(item => item.id === bookId);
     if (existing) {
         existing.quantity += 1;
@@ -574,7 +700,9 @@ function addToCart(bookId) {
             quantity: 1,
             title: book.title,
             author: book.author,
-            price: book.price,
+            price: finalPrice,
+            originalPrice: book.price,
+            discount_percentage: book.discount_percentage || 0,
             image_url: book.image_url
         });
     }

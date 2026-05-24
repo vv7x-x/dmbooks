@@ -1288,6 +1288,64 @@ TOAST NOTIFICATION
 }
 
 /* =====================================================
+STATISTICS GRID
+===================================================== */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--r-md);
+    padding: 24px 20px;
+    text-align: center;
+    transition: var(--t-normal);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+}
+
+.stat-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--brand-dark);
+    margin-bottom: 4px;
+}
+
+.stat-number span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-muted);
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--ink-muted);
+    font-weight: 600;
+}
+
+.stat-card-revenue .stat-icon { color: var(--gold); }
+.stat-card-revenue .stat-number { color: var(--brand-gold); }
+.stat-card-orders .stat-icon { color: var(--brand-green); }
+.stat-card-completed .stat-icon { color: var(--success); }
+.stat-card-books .stat-icon { color: var(--brand-gold); }
+.stat-card-sold .stat-icon { color: var(--brand-green); }
+.stat-card-pending .stat-icon { color: #d4a017; }
+
+/* =====================================================
 CURRENT FILE INFO (EDIT MODE)
 ===================================================== */
 

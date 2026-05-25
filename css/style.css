@@ -2324,3 +2324,57 @@ body.auth-body::before {
 }
 
 .empty-state a { color: var(--gold-deep); font-weight: 700; }
+
+/* ═══════ WHATSAPP NOTE BOX ═══════ */
+.checkout-whatsapp-note {
+    background: linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(18, 140, 126, 0.04) 100%);
+    border: 1px solid rgba(37, 211, 102, 0.25);
+    border-radius: var(--r-md);
+    padding: 16px 18px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.checkout-whatsapp-note .whatsapp-note-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.checkout-whatsapp-note .whatsapp-note-text {
+    flex-grow: 1;
+}
+
+.checkout-whatsapp-note .whatsapp-note-text p {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.checkout-whatsapp-note .whatsapp-note-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: var(--r-full);
+    transition: var(--t-normal);
+}
+
+.checkout-whatsapp-note .whatsapp-note-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.35);
+}

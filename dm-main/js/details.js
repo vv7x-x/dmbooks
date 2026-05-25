@@ -254,7 +254,6 @@ function renderBookDetails(book) {
         </div>`;
     }
     
-    const langValName = isAr ? t.arLangName : t.enLangName;
     const categoryLabel = t["cat" + book.category.charAt(0).toUpperCase() + book.category.slice(1).replace("-", "")] || book.category;
     
     container.innerHTML = `
@@ -263,7 +262,6 @@ function renderBookDetails(book) {
         </div>
         <div class="details-info">
             <div class="details-meta-top">
-                <span class="details-lang-tag">${langValName}</span>
                 <span class="details-category-tag">${categoryLabel}</span>
             </div>
             
@@ -278,10 +276,6 @@ function renderBookDetails(book) {
             <p class="details-desc">${book.description || (currentLang === "ar" ? "لا يوجد وصف متوفر لهذا الكتاب حالياً." : "No description available for this book.")}</p>
             
             <div class="details-specs">
-                <div class="spec-item">
-                    <span class="spec-label">${t.specLanguage}</span>
-                    <span class="spec-val">${langValName}</span>
-                </div>
                 <div class="spec-item">
                     <span class="spec-label">${t.specCategory}</span>
                     <span class="spec-val">${categoryLabel}</span>

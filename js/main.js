@@ -490,9 +490,7 @@ function buildBookCardHtml(book, t) {
             <button class="wishlist-btn ${inWishlist ? "active" : ""}" onclick="toggleWishlistItem('${bookId}')" title="${escapeHtml(t.wishlistDrawerTitle)}">
                 <i class="${inWishlist ? "fa-solid" : "fa-regular"} fa-heart"></i>
             </button>
-            <span class="book-badge ${isOutOfStock ? "badge-out-of-stock" : isAr ? "badge-ar" : "badge-en"}">
-                ${isOutOfStock ? t.outOfStock : isAr ? t.arLangName : t.enLangName}
-            </span>
+            ${isOutOfStock ? `<span class="book-badge badge-out-of-stock">${t.outOfStock}</span>` : ""}
             <a href="book-details.html?id=${bookId}" class="book-card-img">${coverImgHtml}</a>
             <div class="book-card-info">
                 <span class="book-card-category">${categoryLabel}</span>

@@ -484,9 +484,7 @@ body.en-mode .hero-content h1 {
 @keyframes logoGlow {
     0% { opacity: 0.6; transform: scale(1); }
     100% { opacity: 1; transform: scale(1.12); }
-}
-
-#catalogStatusBanner {
+}#catalogStatusBanner {
     margin: 0 auto 1.25rem;
     max-width: 720px;
     text-align: center;
@@ -2615,4 +2613,177 @@ body.auth-body::before {
     .bestseller-card-body h3 {
         font-size: 14px;
     }
+}
+
+/* ═══════ HAMBURGER MENU ═══════ */
+.hamburger-btn {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-full);
+  background: var(--cream);
+  color: var(--walnut-light);
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 1px solid rgba(197, 150, 58, 0.1);
+  cursor: pointer;
+  transition: var(--t-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.hamburger-btn:hover {
+  background: var(--walnut);
+  color: var(--gold);
+}
+
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: 80px;
+    left: 0;
+    right: 0;
+    background: var(--cream);
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-md);
+    flex-direction: column;
+    padding: 16px;
+    gap: 4px;
+    z-index: 99;
+    backdrop-filter: blur(18px);
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-links a {
+    padding: 14px 18px;
+    border-radius: var(--r-md);
+    font-size: 16px;
+    width: 100%;
+  }
+
+  .header-container {
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-content h1 {
+    font-size: 28px;
+  }
+  body.en-mode .hero-content h1 {
+    font-size: 26px;
+  }
+  .hero-container {
+    padding: 50px 16px;
+  }
+  .hero-logo {
+    width: 140px;
+    height: 140px;
+  }
+  .hero-subtitle {
+    font-size: 11px;
+    padding: 6px 14px;
+  }
+  .hero-content p {
+    font-size: 15px;
+  }
+  .books-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+  }
+  .book-card-img {
+    height: 190px;
+  }
+  .book-card-info {
+    padding: 14px 14px 18px;
+  }
+  .book-card-title {
+    font-size: 14px;
+    min-height: 40px;
+  }
+  .book-card-price {
+    font-size: 16px;
+  }
+  .section-header h2 {
+    font-size: 24px;
+  }
+  .main-content {
+    padding: 30px 12px;
+  }
+  .controls-bar {
+    padding: 14px 16px;
+  }
+  .details-container {
+    padding: 16px;
+    gap: 24px;
+  }
+  .details-title {
+    font-size: 24px;
+  }
+  .details-price {
+    font-size: 28px;
+  }
+  .details-gallery {
+    min-height: 280px;
+    padding: 20px;
+  }
+  .details-specs {
+    grid-template-columns: 1fr;
+  }
+  .checkout-card {
+    padding: 18px;
+  }
+  .footer-container {
+    padding: 0 16px;
+  }
+  .footer-bottom {
+    padding: 16px 16px 0;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+  .logo-text {
+    font-size: 24px;
+  }
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .action-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  .lang-switch-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+  .order-success-box {
+    padding: 36px 20px;
+  }
+  .legal-content {
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 380px) {
+  .books-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .book-card-img {
+    height: 160px;
+  }
+  .book-card-title {
+    font-size: 13px;
+    min-height: 36px;
+  }
 }

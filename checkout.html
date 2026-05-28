@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
     <!-- Header -->
     <header id="mainHeader">
         <div class="header-container">
@@ -29,6 +28,7 @@
                 <li><a href="account/profile.html" id="navAccount">حسابي</a></li>
             </ul>
 
+            <button class="hamburger-btn" onclick="toggleMobileMenu()" id="hamburgerBtn" aria-label="القائمة"><i class="fa-solid fa-bars"></i></button>
             <div class="header-actions">
                 <button class="lang-switch-btn" id="langSwitch" onclick="toggleLanguage()">EN</button>
             </div>
@@ -248,5 +248,6 @@
             }
         });
     </script>
+    <script src="js/main.js"></script>
 </body>
 </html>

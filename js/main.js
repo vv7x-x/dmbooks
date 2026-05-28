@@ -882,4 +882,9 @@ function renderWishlist() {
     }).join("");
 }
 
+function toggleMobileMenu() {
+  var nav = document.querySelector('.nav-links');
+  if (nav) nav.classList.toggle('open');
+}
+
 

@@ -7,14 +7,11 @@
     <link rel="preconnect" href="https://vjibucksajumamngxcku.supabase.co" crossorigin>
     <link rel="dns-prefetch" href="https://vjibucksajumamngxcku.supabase.co">
     <title>dm | متجر الكتب الأول</title>
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-    <!-- Header -->
     <header id="mainHeader">
         <div class="header-container">
             <a href="index.html" class="logo" id="headerLogo">
@@ -31,17 +28,18 @@
                 <li><a href="account/profile.html" id="navAccount">حسابي</a></li>
             </ul>
 
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="القائمة" onclick="toggleMobileMenu()">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
             <div class="header-actions">
-                <!-- Lang Switcher -->
                 <button class="lang-switch-btn" id="langSwitch" onclick="toggleLanguage()">EN</button>
                 
-                <!-- Wishlist Toggle -->
                 <button class="action-btn" id="wishlistToggleBtn" onclick="toggleWishlistDrawer(true)">
                     <i class="fa-regular fa-heart"></i>
                     <span class="badge" id="wishlistBadge">0</span>
                 </button>
 
-                <!-- Cart Toggle -->
                 <button class="action-btn" id="cartToggleBtn" onclick="toggleCartDrawer(true)">
                     <i class="fa-solid fa-bag-shopping"></i>
                     <span class="badge" id="cartBadge">0</span>
@@ -50,7 +48,7 @@
         </div>
     </header>
 
-    <!-- Hero Section -->
+    <div id="app-content">
     <section class="hero">
         <div class="hero-overlay"></div>
         <div class="hero-container">
@@ -81,7 +79,6 @@
         </div>
     </section>
 
-    <!-- Best Sellers Section -->
     <section class="bestsellers-section">
         <div class="section-header">
             <h2 id="sectionTitleText">الأكثر مبيعاً</h2>
@@ -90,7 +87,6 @@
             </div>
         </div>
         <div class="bestsellers-scroll" id="bestsellersContainer">
-            <!-- رجاء الانتظار... -->
         </div>
         <div class="bestsellers-cta">
             <a href="catalog.html" class="btn btn-primary" id="btnBrowseAll">
@@ -98,8 +94,8 @@
             </a>
         </div>
     </section>
+    </div>
 
-    <!-- Cart Drawer -->
     <div class="drawer-overlay" id="cartOverlay" onclick="toggleCartDrawer(false)"></div>
     <div class="drawer" id="cartDrawer">
         <div class="drawer-header">
@@ -107,7 +103,6 @@
             <button class="drawer-close" onclick="toggleCartDrawer(false)"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="drawer-body" id="cartItemsContainer">
-            <!-- Dynamic Cart Items -->
         </div>
         <div class="drawer-footer">
             <div class="drawer-summary-row">
@@ -120,7 +115,6 @@
         </div>
     </div>
 
-    <!-- Wishlist Drawer -->
     <div class="drawer-overlay" id="wishlistOverlay" onclick="toggleWishlistDrawer(false)"></div>
     <div class="drawer" id="wishlistDrawer">
         <div class="drawer-header">
@@ -128,11 +122,9 @@
             <button class="drawer-close" onclick="toggleWishlistDrawer(false)"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="drawer-body" id="wishlistItemsContainer">
-            <!-- Dynamic Wishlist Items -->
         </div>
     </div>
 
-    <!-- Footer -->
     <footer>
         <div class="footer-container">
             <div class="footer-col">
@@ -197,16 +189,13 @@
         </div>
     </footer>
 
-    <!-- Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Supabase Config -->
     <script src="js/supabase-config.js"></script>
     <script src="js/api-guard.js"></script>
     <script src="js/books-store.js"></script>
     <script src="js/session.js"></script>
     <script src="js/main.js"></script>
     <script>
-        // Header scroll effect
         window.addEventListener('scroll', () => {
             const header = document.getElementById('mainHeader');
             if (window.scrollY > 20) {

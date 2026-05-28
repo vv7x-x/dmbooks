@@ -132,19 +132,6 @@ const translations = {
         arLangName: "العربية",
         enLangName: "الإنجليزية",
         btnTabStatsText: "الإحصائيات",
-        btnTabEmailText: "إعدادات الإيميل",
-        emailPaneTitle: "إعدادات الإشعارات البريدية",
-        emailPaneDesc: "هذه الإعدادات تُمكّن إرسال إيميلات فورية للأدمن عند وصول طلب جديد أو رسالة تواصل — حتى لو كان الموقع مقفول.",
-        lblAdminEmailInput: "البريد الإلكتروني للأدمن (يستقبل الإشعارات)",
-        lblSupabaseUrlInput: "Supabase Project URL",
-        lblSupabaseAnonKeyInput: "Supabase Anon Key",
-        anonKeyHint: "من Supabase Dashboard → Settings → API → anon public key",
-        btnSaveEmailSettings: "<i class='fa-solid fa-floppy-disk'></i> حفظ الإعدادات",
-        btnTestEmail: "<i class='fa-solid fa-paper-plane'></i> إرسال إيميل تجريبي",
-        emailSettingsSaved: "تم حفظ الإعدادات ✅",
-        emailSettingsError: "فشل حفظ الإعدادات",
-        emailTestSent: "تم إرسال الإيميل التجريبي ✅",
-        emailTestError: "فشل إرسال الإيميل التجريبي",
         statsPaneTitle: "لوحة الإحصائيات",
         btnRefreshStats: "تحديث",
         statLabelRevenue: "إجمالي الإيرادات",
@@ -424,19 +411,6 @@ const translations = {
         notifHoursAgoPlural: "{n} hours ago",
         notifDaysAgo: "1 day ago",
         notifDaysAgoPlural: "{n} days ago",
-        btnTabEmailText: "Email Settings",
-        emailPaneTitle: "Email Notification Settings",
-        emailPaneDesc: "Configure email notifications so the admin receives instant alerts for new orders and contact messages — even when the site is closed.",
-        lblAdminEmailInput: "Admin Email (receives notifications)",
-        lblSupabaseUrlInput: "Supabase Project URL",
-        lblSupabaseAnonKeyInput: "Supabase Anon Key",
-        anonKeyHint: "From Supabase Dashboard → Settings → API → anon public key",
-        btnSaveEmailSettings: "<i class='fa-solid fa-floppy-disk'></i> Save Settings",
-        btnTestEmail: "<i class='fa-solid fa-paper-plane'></i> Send Test Email",
-        emailSettingsSaved: "Settings saved ✅",
-        emailSettingsError: "Failed to save settings",
-        emailTestSent: "Test email sent ✅",
-        emailTestError: "Failed to send test email"
     }
 };
 
@@ -722,16 +696,6 @@ function applyLanguage(lang) {
     safeSetText("notifMarkAllText", t.notifMarkAllText);
     safeSetText("notifEmptyText", t.notifEmptyText);
     
-    // Email Settings translations
-    safeSetText("btnTabEmailText", t.btnTabEmailText);
-    safeSetText("emailPaneTitle", t.emailPaneTitle);
-    safeSetText("emailPaneDesc", t.emailPaneDesc);
-    safeSetText("lblAdminEmailInput", t.lblAdminEmailInput);
-    safeSetText("lblSupabaseUrlInput", t.lblSupabaseUrlInput);
-    safeSetText("lblSupabaseAnonKeyInput", t.lblSupabaseAnonKeyInput);
-    safeSetText("anonKeyHint", t.anonKeyHint);
-    safeSetText("btnSaveEmailSettings", t.btnSaveEmailSettings);
-    safeSetText("btnTestEmail", t.btnTestEmail);
 }
 
 async function checkAuthSession() {
@@ -895,18 +859,15 @@ function switchTab(tab) {
     document.getElementById("tabBtnBooks").classList.toggle("active", tab === "books");
     document.getElementById("tabBtnGovernorates").classList.toggle("active", tab === "governorates");
     document.getElementById("tabBtnStats").classList.toggle("active", tab === "stats");
-    document.getElementById("tabBtnEmailSettings").classList.toggle("active", tab === "email-settings");
     document.getElementById("paneOrders").style.display = tab === "orders" ? "block" : "none";
     document.getElementById("paneBooks").style.display = tab === "books" ? "block" : "none";
     document.getElementById("paneGovernorates").style.display = tab === "governorates" ? "block" : "none";
     document.getElementById("paneStats").style.display = tab === "stats" ? "block" : "none";
-    document.getElementById("paneEmailSettings").style.display = tab === "email-settings" ? "block" : "none";
     
     if (tab === "orders") loadOrders();
     else if (tab === "books") loadBooks();
     else if (tab === "governorates") loadGovernorates();
     else if (tab === "stats") loadDashboardStats();
-    else if (tab === "email-settings") loadEmailSettings();
 }
 
 // ---------------------------
@@ -2401,103 +2362,6 @@ toggleUIState = function (isLoggedIn) {
         updateNotifBadge(0);
     }
 };
-
-// ---------------------------
-// إعدادات الإشعارات البريدية
-// ---------------------------
-
-async function loadEmailSettings() {
-    try {
-        const sb = getSb();
-        const { data: rows } = await sb.from("admin_settings").select("key,value");
-        if (!rows) return;
-        const map = {};
-        rows.forEach(r => map[r.key] = r.value);
-        if (map.admin_email) document.getElementById("adminEmailInput").value = map.admin_email;
-        if (map.supabase_url) document.getElementById("supabaseUrlInput").value = map.supabase_url;
-        if (map.supabase_anon_key) document.getElementById("supabaseAnonKeyInput").value = map.supabase_anon_key;
-    } catch (err) {
-        console.error("[admin] loadEmailSettings:", err);
-    }
-}
-
-async function saveEmailSettings(e) {
-    e.preventDefault();
-    const t = translations[currentLang];
-    const statusEl = document.getElementById("emailSettingsStatus");
-    const adminEmail = document.getElementById("adminEmailInput").value.trim();
-    const supabaseUrl = document.getElementById("supabaseUrlInput").value.trim();
-    const supabaseAnonKey = document.getElementById("supabaseAnonKeyInput").value.trim();
-
-    try {
-        const sb = getSb();
-        const entries = {};
-        if (adminEmail) entries.admin_email = adminEmail;
-        if (supabaseUrl) entries.supabase_url = supabaseUrl;
-        if (supabaseAnonKey) entries.supabase_anon_key = supabaseAnonKey;
-
-        for (const [key, value] of Object.entries(entries)) {
-            await sb.from("admin_settings").upsert({ key, value }, { onConflict: "key" });
-        }
-
-        statusEl.textContent = t.emailSettingsSaved;
-        statusEl.style.color = "var(--success)";
-    } catch (err) {
-        console.error("[admin] saveEmailSettings:", err);
-        statusEl.textContent = t.emailSettingsError;
-        statusEl.style.color = "var(--danger)";
-    }
-
-    setTimeout(() => { statusEl.textContent = ""; }, 4000);
-}
-
-async function testEmailSettings() {
-    const t = translations[currentLang];
-    const statusEl = document.getElementById("emailSettingsStatus");
-    const adminEmail = document.getElementById("adminEmailInput").value.trim();
-    const supabaseUrl = document.getElementById("supabaseUrlInput").value.trim();
-    const supabaseAnonKey = document.getElementById("supabaseAnonKeyInput").value.trim();
-
-    if (!adminEmail || !supabaseUrl || !supabaseAnonKey) {
-        statusEl.textContent = currentLang === "ar" ? "يرجى ملء جميع الحقول أولاً" : "Please fill all fields first";
-        statusEl.style.color = "var(--danger)";
-        setTimeout(() => { statusEl.textContent = ""; }, 4000);
-        return;
-    }
-
-    try {
-        const res = await fetch(`${supabaseUrl}/functions/v1/send-admin-notification`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseAnonKey}`
-            },
-            body: JSON.stringify({
-                type: "contact",
-                title: currentLang === "ar" ? "إيميل تجريبي" : "Test Email",
-                message: currentLang === "ar"
-                    ? "هذا إيميل تجريبي — إعدادات الإشعارات البريدية تعمل بنجاح 🎉"
-                    : "This is a test email — email notification settings are working 🎉"
-            })
-        });
-
-        if (res.ok) {
-            statusEl.textContent = t.emailTestSent;
-            statusEl.style.color = "var(--success)";
-        } else {
-            const errText = await res.text();
-            console.error("[admin] testEmail error:", res.status, errText);
-            statusEl.textContent = t.emailTestError + ` (${res.status})`;
-            statusEl.style.color = "var(--danger)";
-        }
-    } catch (err) {
-        console.error("[admin] testEmail:", err);
-        statusEl.textContent = t.emailTestError;
-        statusEl.style.color = "var(--danger)";
-    }
-
-    setTimeout(() => { statusEl.textContent = ""; }, 4000);
-}
 
 // منع توقف السكربت بسبب Promise مرفوضة غير ملتقطة
 window.dmApiGuard?.installUnhandledRejectionGuard?.("admin", (err) => {

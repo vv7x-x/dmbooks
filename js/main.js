@@ -10,7 +10,7 @@ const translations = {
         btnShopNow: "<i class='fa-solid fa-compass'></i> تصفح الكتب",
         btnWhatsApp: "<i class='fa-brands fa-whatsapp'></i> قناة الواتساب",
         btnInstagram: "<i class='fa-brands fa-instagram'></i> تابعنا على إنستغرام",
-        sectionTitleText: "أحدث الإصدارات",
+        sectionTitleText: "الأكثر مبيعاً",
         searchInput: "ابحث باسم الكتاب أو الكاتب...",
         allCats: "جميع التصنيفات",
         catNovels: "روايات",
@@ -19,10 +19,15 @@ const translations = {
         catChildren: "كتب أطفال",
         catScience: "علوم وتكنولوجيا",
         catHistory: "تاريخ وسير",
+        catPolitics: "سياسة",
+        catPhilosophy: "فكر وفلسفة",
+        catPsychology: "علم نفس",
+        catEconomics: "اقتصاد وإدارة",
+        catHealth: "صحة وطب",
         allLangs: "كل اللغات",
         langAr: "العربية",
         langEn: "English",
-        sortLatest: "الأحدث",
+        sortLatest: "الأكثر مبيعاً",
         sortPriceLow: "السعر: من الأقل للأعلى",
         sortPriceHigh: "السعر: من الأعلى للأقل",
         loadingText: "جاري تحميل الكتب...",
@@ -41,6 +46,11 @@ const translations = {
         footerCatRel: "كتب دينية",
         footerCatSelf: "تنمية بشرية",
         footerCatChild: "كتب أطفال",
+        footerCatPolitics: "سياسة",
+        footerCatPhilosophy: "فكر وفلسفة",
+        footerCatPsychology: "علم نفس",
+        footerCatEconomics: "اقتصاد وإدارة",
+        footerCatHealth: "صحة وطب",
         footerContactTitle: "تواصل معنا",
         footerLocation: "القاهرة، جمهورية مصر العربية",
         footerCopyright: "© 2026 مكتبة dm. جميع الحقوق محفوظة.",
@@ -54,6 +64,7 @@ const translations = {
         arLangName: "العربية",
         enLangName: "الإنجليزية",
         discountLabel: "خصم",
+        btnBrowseAll: "<i class='fa-solid fa-books'></i> تصفح جميع الكتب",
     },
     en: {
         pageTitle: "dm | The Premier Bookstore",
@@ -65,7 +76,7 @@ const translations = {
         btnShopNow: "<i class='fa-solid fa-compass'></i> Browse Books",
         btnWhatsApp: "<i class='fa-brands fa-whatsapp'></i> WhatsApp Channel",
         btnInstagram: "<i class='fa-brands fa-instagram'></i> Instagram Page",
-        sectionTitleText: "Latest Releases",
+        sectionTitleText: "Best Sellers",
         searchInput: "Search by title or author...",
         allCats: "All Categories",
         catNovels: "Novels",
@@ -74,10 +85,15 @@ const translations = {
         catChildren: "Children's Books",
         catScience: "Science & Tech",
         catHistory: "History & Biography",
+        catPolitics: "Politics",
+        catPhilosophy: "Philosophy",
+        catPsychology: "Psychology",
+        catEconomics: "Economics & Business",
+        catHealth: "Health & Medicine",
         allLangs: "All Languages",
         langAr: "Arabic",
         langEn: "English",
-        sortLatest: "Latest Releases",
+        sortLatest: "Best Sellers",
         sortPriceLow: "Price: Low to High",
         sortPriceHigh: "Price: High to Low",
         loadingText: "Loading books...",
@@ -96,6 +112,11 @@ const translations = {
         footerCatRel: "Religious",
         footerCatSelf: "Self-Development",
         footerCatChild: "Children's Books",
+        footerCatPolitics: "Politics",
+        footerCatPhilosophy: "Philosophy",
+        footerCatPsychology: "Psychology",
+        footerCatEconomics: "Economics",
+        footerCatHealth: "Health & Medicine",
         footerContactTitle: "Contact Us",
         footerLocation: "Cairo, Egypt",
         footerCopyright: "© 2026 dm Bookstore. All rights reserved.",
@@ -108,15 +129,23 @@ const translations = {
         authorLabel: "Author: ",
         arLangName: "Arabic",
         enLangName: "English",
-        discountLabel: "Discount"
+        discountLabel: "Discount",
+        btnBrowseAll: "<i class='fa-solid fa-books'></i> Browse All Books"
     }
 };
 
-// إضافة هذا السطر لتجنب الخطأ إذا لم تكن الدالة موجودة
-if (typeof filterBooks !== 'function') {
-    window.filterBooks = function() {
-        console.warn("filterBooks is not defined in this scope, skipping...");
-    };
+function selectCategory(cat) {
+    if (document.getElementById("bestsellersContainer")) {
+        window.location.href = "catalog.html";
+        return;
+    }
+    const el = document.getElementById("categoryFilter");
+    if (el) {
+        el.value = cat;
+        filterBooks();
+        const catalog = document.getElementById("catalog");
+        if (catalog) catalog.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 }
 
 let currentLang = localStorage.getItem("lang") || "ar";
@@ -136,6 +165,11 @@ const CATEGORY_LABEL_KEYS = {
     children: "catChildren",
     science: "catScience",
     history: "catHistory",
+    politics: "catPolitics",
+    philosophy: "catPhilosophy",
+    psychology: "catPsychology",
+    economics: "catEconomics",
+    health: "catHealth",
 };
 
 function escapeHtml(str) {
@@ -192,24 +226,94 @@ function showCatalogBanner(message, type) {
     el.hidden = false;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    applyLanguage(currentLang);
-    showCatalogBanner("");
-
-    if (hydrateBooksFromCache()) {
-        renderBooksGrid();
-    } else {
-        showBooksSkeleton(SKELETON_COUNT);
-    }
-
-    loadBooksFromDB().catch((err) => {
+async function loadBestSellers() {
+    const container = document.getElementById("bestsellersContainer");
+    if (!container) return;
+    try {
+        const sb = window.getSupabaseClient && window.getSupabaseClient();
+        if (!sb) throw new Error("Supabase not ready");
+        const { data } = await sb
+            .from("books")
+            .select("id,title,author,price,category,language,image_url,discount_percentage,is_best_seller")
+            .eq("is_best_seller", true)
+            .limit(20);
+        renderBestSellers(data || []);
+    } catch (err) {
         const msg = window.dmApiGuard?.normalizeError
             ? window.dmApiGuard.normalizeError(err).message
             : String(err?.message || err);
-        console.error("[index] loadBooks:", err);
-        showCatalogBanner(msg, "error");
-        showBooksLoadError(msg);
-    });
+        console.error("[home] loadBestSellers:", err);
+        container.innerHTML = `<div class="bestsellers-empty">${msg}</div>`;
+    }
+}
+
+function renderBestSellers(books) {
+    const container = document.getElementById("bestsellersContainer");
+    if (!container) return;
+    if (!books.length) {
+        container.innerHTML = `<div class="bestsellers-empty" id="bestsellersEmpty">
+            <i class="fa-solid fa-crown" style="font-size:40px;color:var(--gold);opacity:0.4;display:block;margin-bottom:12px;"></i>
+            <span>${currentLang === "ar" ? "لم يحدد المشرف الكتب الأكثر مبيعاً بعد" : "No best sellers selected yet"}</span>
+        </div>`;
+        return;
+    }
+    container.innerHTML = books.map(book => {
+        const t = translations[currentLang];
+        const catKey = CATEGORY_LABEL_KEYS[book.category] || null;
+        const catLabel = catKey && t[catKey] ? t[catKey] : book.category;
+        const discount = parseInt(book.discount_percentage) || 0;
+        const finalPrice = discount > 0 ? (parseFloat(book.price) * (1 - discount / 100)).toFixed(2) : book.price;
+        const coverUrl = window.dmBooks?.bookCoverUrl
+            ? window.dmBooks.bookCoverUrl(book.image_url, 360)
+            : (book.image_url || "");
+        return `
+        <div class="bestseller-card" onclick="window.location.href='book-details.html?id=${book.id}'">
+            <div class="bestseller-card-badge"><i class="fa-solid fa-crown"></i></div>
+            <div class="bestseller-card-img">
+                ${coverUrl ? `<img src="${coverUrl}" alt="${book.title}" loading="lazy" onerror="this.outerHTML='<div class=\\'bestseller-card-placeholder\\'><i class=\\'fa-solid fa-book-open\\'></i></div>'">` : `<div class="bestseller-card-placeholder"><i class="fa-solid fa-book-open"></i></div>`}
+            </div>
+            <div class="bestseller-card-body">
+                <h3>${escapeHtml(book.title)}</h3>
+                <p class="bestseller-card-author">${escapeHtml(book.author || "")}</p>
+                <p class="bestseller-card-cat">${catLabel}</p>
+                <div class="bestseller-card-price">
+                    ${discount > 0 ? `<span class="bestseller-card-old-price">${book.price}</span>` : ""}
+                    <span>${finalPrice} ${t.currency}</span>
+                </div>
+                ${discount > 0 ? `<span class="bestseller-card-discount">-${discount}%</span>` : ""}
+            </div>
+        </div>`;
+    }).join("");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    applyLanguage(currentLang);
+
+    const isHomePage = document.getElementById("bestsellersContainer") !== null;
+    const isCatalogPage = document.getElementById("booksGrid") !== null;
+
+    if (isHomePage) {
+        loadBestSellers();
+    }
+
+    if (isCatalogPage) {
+        showCatalogBanner("");
+
+        if (hydrateBooksFromCache()) {
+            renderBooksGrid();
+        } else {
+            showBooksSkeleton(SKELETON_COUNT);
+        }
+
+        loadBooksFromDB().catch((err) => {
+            const msg = window.dmApiGuard?.normalizeError
+                ? window.dmApiGuard.normalizeError(err).message
+                : String(err?.message || err);
+            console.error("[catalog] loadBooks:", err);
+            showCatalogBanner(msg, "error");
+            showBooksLoadError(msg);
+        });
+    }
 
     updateCartCount();
     updateWishlistCount();
@@ -233,7 +337,12 @@ function toggleLanguage() {
     currentLang = currentLang === "ar" ? "en" : "ar";
     localStorage.setItem("lang", currentLang);
     applyLanguage(currentLang);
-    renderBooksGrid();
+    if (document.getElementById("booksGrid")) {
+        renderBooksGrid();
+    }
+    if (document.getElementById("bestsellersContainer")) {
+        loadBestSellers();
+    }
     renderCart();
     renderWishlist();
 }
@@ -276,6 +385,7 @@ function applyLanguage(lang) {
     safeSetText("btnWhatsApp", t.btnWhatsApp);
     safeSetText("btnInstagram", t.btnInstagram);
     safeSetText("sectionTitleText", t.sectionTitleText);
+    safeSetText("btnBrowseAll", t.btnBrowseAll);
     safeSetPlaceholder("searchInput", t.searchInput);
     safeSetText("heroSubtitle", lang === "ar" ? "<i class='fa-solid fa-star'></i> الوجهة الأولى لمحبي القراءة" : "<i class='fa-solid fa-star'></i> The Ultimate Destination for Book Lovers");
     
@@ -289,6 +399,11 @@ function applyLanguage(lang) {
         catSelect.options[4].text = t.catChildren;
         catSelect.options[5].text = t.catScience;
         catSelect.options[6].text = t.catHistory;
+        catSelect.options[7].text = t.catPolitics;
+        catSelect.options[8].text = t.catPhilosophy;
+        catSelect.options[9].text = t.catPsychology;
+        catSelect.options[10].text = t.catEconomics;
+        catSelect.options[11].text = t.catHealth;
     }
     
     const langSelect = document.getElementById("languageFilter");
@@ -321,6 +436,11 @@ function applyLanguage(lang) {
     safeSetText("footerCatRel", t.footerCatRel);
     safeSetText("footerCatSelf", t.footerCatSelf);
     safeSetText("footerCatChild", t.footerCatChild);
+    safeSetText("footerCatPolitics", t.footerCatPolitics);
+    safeSetText("footerCatPhilosophy", t.footerCatPhilosophy);
+    safeSetText("footerCatPsychology", t.footerCatPsychology);
+    safeSetText("footerCatEconomics", t.footerCatEconomics);
+    safeSetText("footerCatHealth", t.footerCatHealth);
     
     safeSetText("footerContactTitle", t.footerContactTitle);
     safeSetText("footerLocation", t.footerLocation);

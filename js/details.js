@@ -42,6 +42,11 @@ const translations = {
         catChildren: "كتب أطفال",
         catScience: "علوم وتكنولوجيا",
         catHistory: "تاريخ وسير",
+        catPolitics: "سياسة",
+        catPhilosophy: "فكر وفلسفة",
+        catPsychology: "علم نفس",
+        catEconomics: "اقتصاد وإدارة",
+        catHealth: "صحة وطب",
         discountLabel: "خصم"
     },
     en: {
@@ -86,6 +91,11 @@ const translations = {
         catChildren: "Children's Books",
         catScience: "Science & Tech",
         catHistory: "History & Bio",
+        catPolitics: "Politics",
+        catPhilosophy: "Philosophy",
+        catPsychology: "Psychology",
+        catEconomics: "Economics & Business",
+        catHealth: "Health & Medicine",
         discountLabel: "Discount"
     }
 };
